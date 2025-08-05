@@ -10,16 +10,19 @@ async function bootstrap() {
   // Configure Swagger
   const config = new DocumentBuilder()
     .setTitle('Authentication API')
-    .setDescription('API for user authentication, including signup, login, password reset, and protected routes')
+    .setDescription('API for user authentication, including signup, login, and password reset')
     .setVersion('1.0')
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'JWT', // Name of the security scheme
+      'JWT',
     )
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-  await app.listen(3000);
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+
+  console.log(`Server run successfully on port: ${ await app.getUrl()}`);
 }
 bootstrap();
