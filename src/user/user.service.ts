@@ -28,4 +28,15 @@ export class UserService {
   async findById(id: string): Promise<UserDocument | null> {
     return this.userModel.findById(id).exec();
   }
+
+  async updatePassword(userId: string, newPassword: string): Promise<UserDocument | null> {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    return this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { password: hashedPassword },
+        { new: true },
+      )
+      .exec();
+  }
 }
