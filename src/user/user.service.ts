@@ -1,9 +1,10 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { User, UserDocument } from './schemas/user.schema';
+import { User, UserDocument, UserType } from './schemas/user.schema';
 import { SignupDto } from 'src/auth/dto/signup.dto';
 import * as bcrypt from 'bcrypt';
+
 @Injectable()
 export class UserService {
   constructor(
@@ -51,6 +52,17 @@ export class UserService {
           { password: hashedPassword },
           { new: true },
         )
+        .exec();
+    } catch (err) {
+      throw new BadRequestException(err.message);
+    }
+  }
+
+  async findByRoles(roles: UserType[]): Promise<UserDocument[]> {
+    try {
+      return await this.userModel
+        .find({ type: { $in: roles } })
+        .select('email name')
         .exec();
     } catch (err) {
       throw new BadRequestException(err.message);

@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { MailModule } from './mail/mail.module';
 import { LoggerModule } from './middleware/logger.module';
 import { LoggerMiddleware } from './middleware/logger.middleware';
+import { LeaveRequestModule } from './leave-request/leave-request.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     AuthModule,
     MailModule,
     LoggerModule,
+    LeaveRequestModule,
   ],
 })
 export class AppModule {
