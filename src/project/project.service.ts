@@ -121,4 +121,16 @@ export class ProjectService {
       throw new BadRequestException(err.message);
     }
   }
+
+  async deleteProject(id: string): Promise<{ message: string }> {
+    try {
+      const project = await this.projectModel.findByIdAndDelete(id);
+      if (!project) {
+        throw new BadRequestException('Project not found');
+      }
+      return { message: 'Project deleted successfully' };
+    } catch (err) {
+      throw new BadRequestException(err.message);
+    }
+  }
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Get, UseGuards, Request, BadRequestException, Patch, Param } from '@nestjs/common';
+import { Body, Controller, Post, Get, UseGuards, Request, BadRequestException, Patch, Param, Delete } from '@nestjs/common';
 import { ProjectService } from './project.service';
 import { CreateProjectDto } from 'src/project/dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -11,7 +11,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
 
-  @Post()
+  @Post('create')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Create a new project' })
   @ApiResponse({ status: 201, description: 'Project created successfully' })
@@ -56,5 +56,19 @@ export class ProjectController {
       throw new BadRequestException('Only CEO or Manager can update projects');
     }
     return this.projectService.updateProject(id, dto);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Delete a project (CEO/Manager only)' })
+  @ApiResponse({ status: 200, description: 'Project deleted successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  async delete(@Param('id') id: string, @Request() req) {
+    const user = req.user;
+    if (!user || !['ceo', 'manager'].includes(user.type)) {
+      throw new BadRequestException('Only CEO or Manager can delete projects');
+    }
+    return this.projectService.deleteProject(id);
   }
 }
