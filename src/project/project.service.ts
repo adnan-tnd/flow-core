@@ -29,9 +29,7 @@ export class ProjectService {
       // Validate projectManager if provided
       if (createProjectDto.projectManager) {
         const manager = await this.userService.findById(createProjectDto.projectManager);
-        if (!manager || manager.type !== UserType.MANAGER) {
-          throw new BadRequestException('Invalid project manager ID');
-        }
+         
       }
 
       // Validate frontendDevs if provided

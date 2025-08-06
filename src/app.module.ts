@@ -9,6 +9,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
 import { LeaveRequestModule } from './leave-request/leave-request.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { ProjectModule } from './project/project.module';
+import { SprintModule } from './sprint/sprint.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ProjectModule } from './project/project.module';
     LeaveRequestModule,
     AttendanceModule,
     ProjectModule,
+    SprintModule,
   ],
 })
 export class AppModule {
