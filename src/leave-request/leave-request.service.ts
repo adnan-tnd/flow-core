@@ -8,7 +8,8 @@ import { UpdateLeaveRequestDto } from './dto/update-leave-request.dto';
 import { UserService } from '../user/user.service';
 import { MailService } from '../mail/mail.service';
 import { JwtService } from '@nestjs/jwt';
-import { UserType } from '../user/schemas/user.schema';
+import { UserType } from 'src/user/types/user';
+
 
 @Injectable()
 export class LeaveRequestService {

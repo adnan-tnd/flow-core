@@ -1,13 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-
+import { UserType } from 'src/user/types/user';
 export type UserDocument = User & Document;
 
-export enum UserType {
-  CEO = 'ceo',
-  MANAGER = 'manager',
-  MEMBER = 'member',
-}
+
 
 @Schema()
 export class User {

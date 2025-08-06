@@ -27,8 +27,9 @@ export class AuthService {
       const userId = user._id?.toString?.() || user.id;
 
       const token = this.jwtService.sign({
-        id: userId,
-        // Ensure name is included in the token
+        sub: userId,
+        email: user.email,
+        type: user.type,
       });
 
       return {
