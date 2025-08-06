@@ -7,6 +7,7 @@ import { MailModule } from './mail/mail.module';
 import { LoggerModule } from './middleware/logger.module';
 import { LoggerMiddleware } from './middleware/logger.middleware';
 import { LeaveRequestModule } from './leave-request/leave-request.module';
+import { AttendanceModule } from './attendance/attendance.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { LeaveRequestModule } from './leave-request/leave-request.module';
     MailModule,
     LoggerModule,
     LeaveRequestModule,
+    AttendanceModule,
   ],
 })
 export class AppModule {
