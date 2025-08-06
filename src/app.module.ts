@@ -10,6 +10,7 @@ import { LeaveRequestModule } from './leave-request/leave-request.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { ProjectModule } from './project/project.module';
 import { SprintModule } from './sprint/sprint.module';
+import { ReviewModule } from './review/review.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { SprintModule } from './sprint/sprint.module';
     AttendanceModule,
     ProjectModule,
     SprintModule,
+    ReviewModule,
   ],
 })
 export class AppModule {

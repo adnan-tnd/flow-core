@@ -1,6 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { User } from '../../user/schemas/user.schema'; // Adjusted path
+import { HydratedDocument, Schema as mongooseSchema } from 'mongoose';
+
 import { LeaveType, LeaveStatus } from 'src/leave-request/types/leave-request'; // Adjusted path
 export type LeaveRequestDocument = LeaveRequest & Document;
 
@@ -8,8 +10,8 @@ export type LeaveRequestDocument = LeaveRequest & Document;
 
 @Schema({ timestamps: true })
 export class LeaveRequest {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true }) // Use string 'User' for ref
-  userId: Types.ObjectId;
+  @Prop({ type: mongooseSchema.Types.ObjectId, ref: 'User', required: true }) // Use string 'User' for ref
+  userId: mongooseSchema.Types.ObjectId;
 
   @Prop({ required: true, enum: LeaveType })
   type: LeaveType;
