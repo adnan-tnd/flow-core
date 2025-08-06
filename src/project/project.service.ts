@@ -81,6 +81,24 @@ export class ProjectService {
     }
   }
 
+  async findById(id: string): Promise<ProjectDocument> {
+    try {
+      const project = await this.projectModel
+        .findById(id)
+        .populate('createdBy', 'name email')
+        .populate('projectManager', 'name email')
+        .populate('frontendDevs', 'name email')
+        .populate('backendDevs', 'name email')
+        .exec();
+      if (!project) {
+        throw new BadRequestException('Project not found');
+      }
+      return project;
+    } catch (err) {
+      throw new BadRequestException(err.message);
+    }
+  }
+
   async findMyProjects(userId: string): Promise<ProjectDocument[]> {
     try {
       return await this.projectModel

@@ -6,7 +6,7 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 import { CreateSprintDto } from '../sprint/dto/create-sprint.dto';
 import { UpdateSprintDto } from '../sprint/dto/update-sprint.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { UserType } from '../user/types/user';
 
 @ApiTags('project')
@@ -39,7 +39,6 @@ export class ProjectController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
   async createSprint(
-    
     @Body() dto: CreateSprintDto,
     @Request() req,
   ) {
@@ -109,6 +108,23 @@ export class ProjectController {
       throw new UnauthorizedException('User not authenticated');
     }
     return this.projectService.findMyProjects(req.user.sub);
+  }
+
+  @Get('details/:id')
+  @ApiOperation({ summary: 'Get project details with sprints (public)' })
+  @ApiResponse({ status: 200, description: 'Project details with associated sprints' })
+  @ApiResponse({ status: 400, description: 'Project not found' })
+  @ApiParam({ name: 'id', description: 'Project ID', type: String })
+  async getProjectDetails(@Param('id') id: string) {
+    const project = await this.projectService.findById(id);
+    if (!project) {
+      throw new BadRequestException('Project not found');
+    }
+    const sprints = await this.sprintService.findAllByProject(id);
+    return {
+      project,
+      sprints,
+    };
   }
 
   @Patch(':id')
