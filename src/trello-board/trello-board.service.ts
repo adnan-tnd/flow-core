@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, BadRequestException,ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { TrelloBoard, TrelloBoardDocument } from './schemas/trello-board.schema';
@@ -127,31 +127,183 @@ export class TrelloBoardService {
   }
 
   async createList(boardId: string, name: string, userId: string): Promise<ListDocument> {
-    try {
-      const user = await this.userService.findById(userId);
-      if (!user || !user._id) {
-        throw new UnauthorizedException('User not authenticated');
-      }
+  try {
+    const user = await this.userService.findById(userId);
+    if (!user || !user._id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
 
+    const board = await this.trelloBoardModel.findById(boardId);
+    if (!board) {
+      throw new BadRequestException('Board not found');
+    }
+
+    const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+    const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+    const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+    if (!isPrivilegedRole && !isBoardMember) {
+      throw new UnauthorizedException('Only board members, CEO or Manager can create the list');
+    }
+
+    const createdList = new this.listModel({
+      name,
+      board: new Types.ObjectId(boardId),
+      createdBy: userIdObj,
+    });
+    return await createdList.save();
+  } catch (err) {
+    throw new BadRequestException(err.message);
+  }
+}
+
+async deleteList(listId: string, userId: string): Promise<void> {
+  try {
+    const user = await this.userService.findById(userId);
+    if (!user || !user._id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    const list = await this.listModel.findById(listId);
+    if (!list) {
+      throw new BadRequestException('List not found');
+    }
+
+    const board = await this.trelloBoardModel.findById(list.board);
+    if (!board) {
+      throw new BadRequestException('Board not found');
+    }
+
+    const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+
+    // ✅ Check if user is CEO or MANAGER or board member
+    const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+    const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+    if (!isPrivilegedRole && !isBoardMember) {
+      throw new UnauthorizedException('Only board members, CEO or Manager can delete the list');
+    }
+
+    await this.listModel.deleteOne({ _id: listId });
+  } catch (err) {
+    throw new BadRequestException(err.message);
+  }
+}
+
+    async updateList(listId: string, newName: string, userId: string): Promise<ListDocument> {
+    try {
+    const user = await this.userService.findById(userId);
+    if (!user || !user._id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    const list = await this.listModel.findById(listId);
+    if (!list) {
+      throw new BadRequestException('List not found');
+    }
+
+    const board = await this.trelloBoardModel.findById(list.board);
+    if (!board) {
+      throw new BadRequestException('Board not found');
+    }
+
+    const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+
+    // ✅ Check if user is CEO or MANAGER or board member
+    const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+    const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+    if (!isPrivilegedRole && !isBoardMember) {
+      throw new UnauthorizedException('Only board members, CEO or Manager can update the list');
+    }
+
+    list.name = newName;
+    return await list.save();
+  } catch (err) {
+    throw new BadRequestException(err.message);
+  }
+}
+
+  async getBoardLists(boardId: string, userId: string):  Promise<ListDocument[]> {
+    try {
+    const user = await this.userService.findById(userId);
+    if (!user || !user._id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
       const board = await this.trelloBoardModel.findById(boardId);
       if (!board) {
         throw new BadRequestException('Board not found');
       }
-
-      // Check if the user is a member of the board
       const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
-      if (!board.members.some((id) => (id as Types.ObjectId).equals(userIdObj))) {
-        throw new UnauthorizedException('Only board members can create lists');
-      }
 
-      const createdList = new this.listModel({
-        name,
-        board: new Types.ObjectId(boardId),
-        createdBy: userIdObj,
-      });
-      return await createdList.save();
+    // ✅ Check if user is CEO or MANAGER or board member
+    const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+    const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+    if (!isPrivilegedRole && !isBoardMember) {
+      throw new UnauthorizedException('Only board members, CEO or Manager can see this board list');
+    }
+
+      return await this.listModel.find({ board: boardId }).exec();
     } catch (err) {
       throw new BadRequestException(err.message);
     }
   }
+
+
+  async getMyBoards(userId: string): Promise<{ _id: string; name: string }[]> {
+  try {
+    const user = await this.userService.findById(userId);
+    if (!user || !user._id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    const boards = await this.trelloBoardModel
+      .find({ members: user._id })
+      .select('_id name') // Only select _id and name
+      .lean(); // Convert Mongoose documents to plain JS objects
+
+    return boards.map((board) => ({
+      _id: board._id.toString(),
+      name: board.name,
+    }));
+  } catch (err) {
+    throw new BadRequestException(err.message);
+  }
+}
+
+async getBoardMembers(boardId: string, userId: string): Promise<UserDocument[]> {
+  try {
+    const board = await this.trelloBoardModel.findById(boardId).populate('members').exec();
+    const user = await this.userService.findById(userId);
+    if (!user || !user._id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    if (!board) {
+      throw new BadRequestException('Board not found');
+    }
+
+     const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+
+    // ✅ Check if user is CEO or MANAGER or board member
+    const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+    const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+    if (!isPrivilegedRole && !isBoardMember) {
+      throw new UnauthorizedException('You are not allowed to view this board members');
+    }
+    return board.members.map((member: any) => {
+      return {
+        _id: member._id.toString(),
+        name: member.name,
+        email: member.email,
+      } as UserDocument;
+    });
+  } catch (err) {
+    throw new BadRequestException(err.message);
+  }
+}
+
+
+
 }
