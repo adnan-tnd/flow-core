@@ -11,7 +11,7 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { ProjectModule } from './project/project.module';
 import { SprintModule } from './sprint/sprint.module';
 import { ReviewModule } from './review/review.module';
-
+import { TrelloBoardModule } from './trello-board/trello-board.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -31,7 +31,8 @@ import { ReviewModule } from './review/review.module';
     ProjectModule,
     SprintModule,
     ReviewModule,
-  ],
+    TrelloBoardModule
+   ],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
