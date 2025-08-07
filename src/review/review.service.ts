@@ -1,7 +1,8 @@
 import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Review, ReviewDocument, ReviewType } from './schemas/review.schema';
+import { Review, ReviewDocument } from './schemas/review.schema';
+import { ReviewType } from 'src/review/types/review'; // Adjusted path
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UserService } from '../user/user.service';
 import { ProjectService } from '../project/project.service';

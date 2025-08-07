@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { AttendanceStatus } from '../schemas/attendance.schema';
+import { AttendanceStatus } from 'src/attendance/types/attendance'; // Adjusted path
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ClockInOutDto {

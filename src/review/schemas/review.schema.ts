@@ -3,11 +3,8 @@ import { Document, Types } from 'mongoose';
 import { HydratedDocument, Schema as mongooseSchema } from 'mongoose';
 import { User } from 'src/user/schemas/user.schema';
 import { Project } from 'src/project/schemas/project.schema';
+import { ReviewType } from 'src/review/types/review'; // Adjusted path
 
-export enum ReviewType {
-  USER = 'user',
-  PROJECT = 'project',
-}
 
 export type ReviewDocument = Review & Document;
 
@@ -18,10 +15,10 @@ export class Review extends Document {
   @Prop({ type: mongooseSchema.Types.ObjectId, ref: User.name, required: true })
   reviewedBy:  mongooseSchema.Types.ObjectId;
 
-  @Prop({ required: true, min: 1, max: 5 })
+  @Prop({type: Number, required: true, min: 1, max: 5 })
   rating: number;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ type: String, required: true, trim: true })
   comment: string;
 
   @Prop({ type: mongooseSchema.Types.ObjectId, ref: Project.name, required: false })

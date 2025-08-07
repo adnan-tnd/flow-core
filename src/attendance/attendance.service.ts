@@ -1,7 +1,8 @@
 import { Injectable, BadRequestException, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Attendance, AttendanceDocument, AttendanceStatus } from './schemas/attendance.schema';
+import { Attendance, AttendanceDocument } from './schemas/attendance.schema';
+import { AttendanceStatus } from './types/attendance';
 import { LeaveRequest, LeaveRequestDocument } from '../leave-request/schemas/leave-request.schema';
 import { LeaveStatus } from '../leave-request/types/leave-request';
 import { ClockInOutDto, AttendanceReportDto } from './dto/attendance.dto';

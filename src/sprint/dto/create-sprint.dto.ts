@@ -1,6 +1,6 @@
 import { IsString, IsNotEmpty, IsDateString, IsEnum, IsMongoId } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { SprintStatus } from '../schemas/sprint.schema';
+import { SprintStatus } from 'src/sprint/types/sprint';
 
 export class CreateSprintDto {
   @ApiProperty({ description: 'Name of the sprint' })

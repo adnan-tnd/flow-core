@@ -13,16 +13,16 @@ export class LeaveRequest {
   @Prop({ type: mongooseSchema.Types.ObjectId, ref: 'User', required: true }) // Use string 'User' for ref
   userId: mongooseSchema.Types.ObjectId;
 
-  @Prop({ required: true, enum: LeaveType })
+  @Prop({ type: String, required: true, enum: LeaveType })
   type: LeaveType;
 
-  @Prop({ required: true, enum: LeaveStatus, default: LeaveStatus.PENDING })
+  @Prop({ type: String, required: true, enum: LeaveStatus, default: LeaveStatus.PENDING })
   status: LeaveStatus;
 
-  @Prop({ required: true })
+  @Prop({ type: String, required: true })
   reason: string;
 
-  @Prop({ required: true })
+  @Prop({type: Number, required: true })
   quantity: number;
 }
 

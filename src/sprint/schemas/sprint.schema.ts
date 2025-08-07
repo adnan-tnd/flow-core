@@ -1,36 +1,32 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { HydratedDocument, Schema as mongooseSchema } from 'mongoose';
+import {SprintStatus} from 'src/sprint/types/sprint';
 
-export enum SprintStatus {
-  ToDo = 'To Do',
-  InProgress = 'In Progress',
-  Complete = 'Complete',
-}
 
 export type SprintDocument = Sprint & Document;
 
 @Schema({ timestamps: true })
 export class Sprint {
-  @Prop({ required: true })
+  @Prop({type: String, required: true })
   name: string;
 
   @Prop()
   description: string;
 
-  @Prop({ required: true })
+  @Prop({type: Date, required: true })
   startTime: Date;
 
-  @Prop({ required: true })
+  @Prop({ type: Date, required: true })
   endTime: Date;
 
-  @Prop({ required: true, enum: SprintStatus, default: SprintStatus.ToDo })
+  @Prop({ type: String, required: true, enum: SprintStatus, default: SprintStatus.ToDo })
   status: SprintStatus;
 
-  @Prop({ type: mongooseSchema.Types.ObjectId, ref: 'Project', required: true })
+  @Prop({ type: mongooseSchema.Types.ObjectId, required: true })
   projectId: mongooseSchema.Types.ObjectId;
 
-  @Prop({ type: mongooseSchema.Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: mongooseSchema.Types.ObjectId, required: true })
   createdBy:mongooseSchema.Types.ObjectId;
 }
 
