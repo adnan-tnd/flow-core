@@ -7,6 +7,9 @@ import { CreateBoardDto } from './dto/create-board.dto';
 import { AddUsersDto } from './dto/add-users.dto';
 import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
+import { CreateCardDto } from './dto/create-card.dto';
+import { UpdateCardDto } from './dto/update-card.dto';
+
 @ApiTags('trello-board')
 @ApiBearerAuth('JWT')
 @Controller('trello-board')
@@ -73,76 +76,164 @@ export class TrelloBoardController {
   @ApiResponse({ status: 400, description: 'Invalid input' })
   @ApiParam({ name: 'listId', description: 'List ID', type: String })
   async updateList(
-  @Param('listId') listId: string,
-  @Body() dto: UpdateListDto,
-  @Request() req,
-) {
-  if (!req.user || !req.user.sub) {
-    throw new UnauthorizedException('User not authenticated');
-  }
-  return this.trelloBoardService.updateList(listId, dto.name, req.user.sub);
-}
-
-@Get('my-boards')
-@UseGuards(JwtAuthGuard)
-@ApiOperation({ summary: 'Get all boards the user is a member of' })
-@ApiResponse({ status: 200, description: 'Boards fetched successfully' })
-@ApiResponse({ status: 401, description: 'Unauthorized' })
-async getMyBoards(@Request() req) {
-  if (!req.user || !req.user.sub) {
-    throw new UnauthorizedException('User not authenticated');
+    @Param('listId') listId: string,
+    @Body() dto: UpdateListDto,
+    @Request() req,
+  ) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    return this.trelloBoardService.updateList(listId, dto.name, req.user.sub);
   }
 
-  return this.trelloBoardService.getMyBoards(req.user.sub);
-}
-
-@Get('board-members/:boardId')
-@UseGuards(JwtAuthGuard)
-@ApiOperation({ summary: 'Get all members of a Trello board' })
-@ApiResponse({ status: 200, description: 'Members fetched successfully' })
-@ApiResponse({ status: 401, description: 'Unauthorized' })
-@ApiParam({ name: 'boardId', description: 'Board ID', type: String })
-async getBoardMembers(@Param('boardId') boardId: string, @Request() req) {
-  if (!req.user || !req.user.sub) {
-    throw new UnauthorizedException('User not authenticated');
+  @Get('my-boards')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get all boards the user is a member of' })
+  @ApiResponse({ status: 200, description: 'Boards fetched successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getMyBoards(@Request() req) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    return this.trelloBoardService.getMyBoards(req.user.sub);
   }
 
-  const userId = req.user.sub;
-
-  return this.trelloBoardService.getBoardMembers(boardId, userId);
-}
-
-@Get('board-lists/:boardId')
-@UseGuards(JwtAuthGuard)
-@ApiOperation({ summary: 'Get all lists of a Trello board' })
-@ApiResponse({ status: 200, description: 'Lists fetched successfully' })
-@ApiResponse({ status: 401, description: 'Unauthorized' })
-@ApiParam({ name: 'boardId', description: 'Board ID', type: String })
-async getBoardLists(@Param('boardId') boardId: string, @Request() req) {
-  if (!req.user || !req.user.sub) {
-    throw new UnauthorizedException('User not authenticated');
+  @Get('board-members/:boardId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get all members of a Trello board' })
+  @ApiResponse({ status: 200, description: 'Members fetched successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiParam({ name: 'boardId', description: 'Board ID', type: String })
+  async getBoardMembers(@Param('boardId') boardId: string, @Request() req) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    const userId = req.user.sub;
+    return this.trelloBoardService.getBoardMembers(boardId, userId);
   }
-    if (!boardId) { 
-        throw new BadRequestException('Board ID is required');                                  
-    }                                       
-  return this.trelloBoardService.getBoardLists(boardId, req.user.sub); 
-}
-    
-@Delete('delete-list/:listId')
-@UseGuards(JwtAuthGuard)
-@ApiOperation({ summary: 'Delete a list from a Trello board' })
-@ApiResponse({ status: 200, description: 'List deleted successfully' })
-@ApiResponse({ status: 401, description: 'Unauthorized' })
-@ApiResponse({ status: 400, description: 'Invalid input' })
-@ApiParam({ name: 'listId', description: 'List ID', type: String })
-async deleteList(@Param('listId') listId: string, @Request() req) {
-  if (!req.user || !req.user.sub) {
-    throw new UnauthorizedException('User not authenticated');
+
+  // @Get('board-lists/:boardId')
+  // @UseGuards(JwtAuthGuard)
+  // @ApiOperation({ summary: 'Get all lists of a Trello board' })
+  // @ApiResponse({ status: 200, description: 'Lists fetched successfully' })
+  // @ApiResponse({ status: 401, description: 'Unauthorized' })
+  // @ApiParam({ name: 'boardId', description: 'Board ID', type: String })
+  // async getBoardLists(@Param('boardId') boardId: string, @Request() req) {
+  //   if (!req.user || !req.user.sub) {
+  //     throw new UnauthorizedException('User not authenticated');
+  //   }
+  //   if (!boardId) {
+  //     throw new BadRequestException('Board ID is required');
+  //   }
+  //   return this.trelloBoardService.getBoardLists(boardId, req.user.sub);
+  // }
+    @Get('board-lists/:boardId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get all lists of a Trello board with their cards' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lists and their cards fetched successfully',
+  
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiParam({ name: 'boardId', description: 'Board ID', type: String })
+  async getBoardLists(@Param('boardId') boardId: string, @Request() req) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    if (!boardId) {
+      throw new BadRequestException('Board ID is required');
+    }
+    return this.trelloBoardService.getBoardLists(boardId, req.user.sub);
   }
-  await this.trelloBoardService.deleteList(listId, req.user.sub);
-  return { message: 'List deleted Successfully' }      
-}
 
 
+  @Delete('delete-list/:listId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Delete a list from a Trello board' })
+  @ApiResponse({ status: 200, description: 'List deleted successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiParam({ name: 'listId', description: 'List ID', type: String })
+  async deleteList(@Param('listId') listId: string, @Request() req) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    await this.trelloBoardService.deleteList(listId, req.user.sub);
+    return { message: 'List deleted Successfully' };
+  }
 
+  @Post('create-card')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Create a new card on a Trello board list' })
+  @ApiResponse({ status: 201, description: 'Card created successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  async createCard(@Body() dto: CreateCardDto, @Request() req) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    return this.trelloBoardService.createCard(
+      dto.name,
+      dto.listId,
+      req.user.sub,
+      dto.description,
+      dto.assignedUsers,
+      dto.dueDate,
+    );
+  }
+
+  @Post('update-card/:cardId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Update an existing card on a Trello board' })
+  @ApiResponse({ status: 200, description: 'Card updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiParam({ name: 'cardId', description: 'Card ID', type: String })
+  async updateCard(
+    @Param('cardId') cardId: string,
+    @Body() dto: UpdateCardDto,
+    @Request() req,
+  ) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    return this.trelloBoardService.updateCard(cardId, req.user.sub, {
+      name: dto.name,
+      description: dto.description,
+      assignedUsers: dto.assignedUsers,
+      listId: dto.listId,
+      dueDate: dto.dueDate,
+    });
+  }
+
+  @Delete('delete-card/:cardId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Delete a card from a Trello board list' })
+  @ApiResponse({ status: 200, description: 'Card deleted successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiParam({ name: 'cardId', description: 'Card ID', type: String })
+  async deleteCard(@Param('cardId') cardId: string, @Request() req) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    await this.trelloBoardService.deleteCard(cardId, req.user.sub);
+    return { message: 'Card deleted Successfully' };
+  }
+
+  @Get('card-details/:cardId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get details of a specific card' })
+  @ApiResponse({ status: 200, description: 'Card details fetched successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Card not found' })
+  @ApiParam({ name: 'cardId', description: 'Card ID', type: String })
+  async getCardDetails(@Param('cardId') cardId: string, @Request() req) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    return this.trelloBoardService.getCardDetails(cardId, req.user.sub);
+  }
 }

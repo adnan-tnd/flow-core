@@ -1,7 +1,8 @@
-import { Injectable, BadRequestException,ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { TrelloBoard, TrelloBoardDocument } from './schemas/trello-board.schema';
+import { Card, CardDocument } from './schemas/card.schema';
 import { List, ListDocument } from './schemas/list.schema';
 import { UserService } from '../user/user.service';
 import { MailService } from '../mail/mail.service';
@@ -17,6 +18,8 @@ export class TrelloBoardService {
     private trelloBoardModel: Model<TrelloBoardDocument>,
     @InjectModel(List.name)
     private listModel: Model<ListDocument>,
+    @InjectModel(Card.name)
+    private cardModel: Model<CardDocument>,
     private userService: UserService,
     private mailService: MailService,
   ) {}
@@ -31,7 +34,7 @@ export class TrelloBoardService {
       const createdBoard = new this.trelloBoardModel({
         name,
         createdBy: new Types.ObjectId(userId),
-        members: [new Types.ObjectId(userId)], // Creator is automatically a member
+        members: [new Types.ObjectId(userId)],
       });
       return await createdBoard.save();
     } catch (err) {
@@ -71,14 +74,13 @@ export class TrelloBoardService {
           board.members.some((id) => (id as Types.ObjectId).equals(userIdObj)) ||
           board.invitedUsers.some((id) => (id as Types.ObjectId).equals(userIdObj))
         ) {
-          continue; // Skip users who are already members or invited
+          continue;
         }
 
         const token = uuidv4();
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours expiry
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
         newInvitations.push({ token, userId: userIdObj, expiresAt });
 
-        // Send invitation email
         const acceptLink = `http://your-app-domain.com/trello-board/accept-invitation/${boardId}/${token}`;
         await this.mailService.sendMail({
           to: user.email,
@@ -110,13 +112,11 @@ export class TrelloBoardService {
         throw new BadRequestException('Invalid or expired invitation token');
       }
 
-      // Add user to members
       const userIdObj = invitation.userId;
       if (!board.members.some((id) => (id as Types.ObjectId).equals(userIdObj))) {
         board.members.push(userIdObj);
       }
 
-      // Remove from invitedUsers and pendingInvitations
       board.invitedUsers = board.invitedUsers.filter((id) => !(id as Types.ObjectId).equals(userIdObj));
       board.pendingInvitations = board.pendingInvitations.filter((inv) => inv.token !== token);
 
@@ -127,124 +127,160 @@ export class TrelloBoardService {
   }
 
   async createList(boardId: string, name: string, userId: string): Promise<ListDocument> {
-  try {
-    const user = await this.userService.findById(userId);
-    if (!user || !user._id) {
-      throw new UnauthorizedException('User not authenticated');
-    }
-
-    const board = await this.trelloBoardModel.findById(boardId);
-    if (!board) {
-      throw new BadRequestException('Board not found');
-    }
-
-    const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
-    const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
-    const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
-
-    if (!isPrivilegedRole && !isBoardMember) {
-      throw new UnauthorizedException('Only board members, CEO or Manager can create the list');
-    }
-
-    const createdList = new this.listModel({
-      name,
-      board: new Types.ObjectId(boardId),
-      createdBy: userIdObj,
-    });
-    return await createdList.save();
-  } catch (err) {
-    throw new BadRequestException(err.message);
-  }
-}
-
-async deleteList(listId: string, userId: string): Promise<void> {
-  try {
-    const user = await this.userService.findById(userId);
-    if (!user || !user._id) {
-      throw new UnauthorizedException('User not authenticated');
-    }
-
-    const list = await this.listModel.findById(listId);
-    if (!list) {
-      throw new BadRequestException('List not found');
-    }
-
-    const board = await this.trelloBoardModel.findById(list.board);
-    if (!board) {
-      throw new BadRequestException('Board not found');
-    }
-
-    const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
-
-    // ✅ Check if user is CEO or MANAGER or board member
-    const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
-    const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
-
-    if (!isPrivilegedRole && !isBoardMember) {
-      throw new UnauthorizedException('Only board members, CEO or Manager can delete the list');
-    }
-
-    await this.listModel.deleteOne({ _id: listId });
-  } catch (err) {
-    throw new BadRequestException(err.message);
-  }
-}
-
-    async updateList(listId: string, newName: string, userId: string): Promise<ListDocument> {
     try {
-    const user = await this.userService.findById(userId);
-    if (!user || !user._id) {
-      throw new UnauthorizedException('User not authenticated');
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      const board = await this.trelloBoardModel.findById(boardId);
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO or Manager can create the list');
+      }
+
+      const createdList = new this.listModel({
+        name,
+        board: new Types.ObjectId(boardId),
+        createdBy: userIdObj,
+      });
+      return await createdList.save();
+    } catch (err) {
+      throw new BadRequestException(err.message);
     }
-
-    const list = await this.listModel.findById(listId);
-    if (!list) {
-      throw new BadRequestException('List not found');
-    }
-
-    const board = await this.trelloBoardModel.findById(list.board);
-    if (!board) {
-      throw new BadRequestException('Board not found');
-    }
-
-    const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
-
-    // ✅ Check if user is CEO or MANAGER or board member
-    const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
-    const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
-
-    if (!isPrivilegedRole && !isBoardMember) {
-      throw new UnauthorizedException('Only board members, CEO or Manager can update the list');
-    }
-
-    list.name = newName;
-    return await list.save();
-  } catch (err) {
-    throw new BadRequestException(err.message);
   }
-}
 
-  async getBoardLists(boardId: string, userId: string):  Promise<ListDocument[]> {
+  async deleteList(listId: string, userId: string): Promise<void> {
     try {
-    const user = await this.userService.findById(userId);
-    if (!user || !user._id) {
-      throw new UnauthorizedException('User not authenticated');
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      const list = await this.listModel.findById(listId);
+      if (!list) {
+        throw new BadRequestException('List not found');
+      }
+
+      const board = await this.trelloBoardModel.findById(list.board);
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO or Manager can delete the list');
+      }
+
+      await this.listModel.deleteOne({ _id: listId });
+    } catch (err) {
+      throw new BadRequestException(err.message);
     }
+  }
+
+  async updateList(listId: string, newName: string, userId: string): Promise<ListDocument> {
+    try {
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      const list = await this.listModel.findById(listId);
+      if (!list) {
+        throw new BadRequestException('List not found');
+      }
+
+      const board = await this.trelloBoardModel.findById(list.board);
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO or Manager can update the list');
+      }
+
+      list.name = newName;
+      return await list.save();
+    } catch (err) {
+      throw new BadRequestException(err.message);
+    }
+  }
+
+  // async getBoardLists(boardId: string, userId: string): Promise<ListDocument[]> {
+  //   try {
+  //     const user = await this.userService.findById(userId);
+  //     if (!user || !user._id) {
+  //       throw new UnauthorizedException('User not authenticated');
+  //     }
+  //     const board = await this.trelloBoardModel.findById(boardId);
+  //     if (!board) {
+  //       throw new BadRequestException('Board not found');
+  //     }
+  //     const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+  //     const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+  //     const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+  //     if (!isPrivilegedRole && !isBoardMember) {
+  //       throw new UnauthorizedException('Only board members, CEO or Manager can see this board list');
+  //     }
+
+  //     return await this.listModel.find({ board: boardId }).exec();
+  //   } catch (err) {
+  //     throw new BadRequestException(err.message);
+  //   }
+  // }
+
+   async getBoardLists(boardId: string, userId: string): Promise<Array<{ _id: string; name: string; cards: Array<{ _id: string; name: string }> }>> {
+    try {
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
       const board = await this.trelloBoardModel.findById(boardId);
       if (!board) {
         throw new BadRequestException('Board not found');
       }
       const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
 
-    // ✅ Check if user is CEO or MANAGER or board member
-    const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
-    const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO or Manager can see this board list');
+      }
 
-    if (!isPrivilegedRole && !isBoardMember) {
-      throw new UnauthorizedException('Only board members, CEO or Manager can see this board list');
-    }
+      const lists = await this.listModel.find({ board: boardId }).lean();
+      const listsWithCards = await Promise.all(
+        lists.map(async (list) => {
+          const cards = await this.cardModel
+            .find({ list: list._id })
+            .select('_id name')
+            .lean();
+          return {
+            _id: list._id.toString(),
+            name: list.name,
+            cards: cards.map((card) => ({
+              _id: card._id.toString(),
+              name: card.name,
+            })),
+          };
+        }),
+      );
 
-      return await this.listModel.find({ board: boardId }).exec();
+      return listsWithCards;
     } catch (err) {
       throw new BadRequestException(err.message);
     }
@@ -252,58 +288,442 @@ async deleteList(listId: string, userId: string): Promise<void> {
 
 
   async getMyBoards(userId: string): Promise<{ _id: string; name: string }[]> {
-  try {
-    const user = await this.userService.findById(userId);
-    if (!user || !user._id) {
-      throw new UnauthorizedException('User not authenticated');
+    try {
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      const boards = await this.trelloBoardModel
+        .find({ members: user._id })
+        .select('_id name')
+        .lean();
+
+      return boards.map((board) => ({
+        _id: board._id.toString(),
+        name: board.name,
+      }));
+    } catch (err) {
+      throw new BadRequestException(err.message);
     }
-
-    const boards = await this.trelloBoardModel
-      .find({ members: user._id })
-      .select('_id name') // Only select _id and name
-      .lean(); // Convert Mongoose documents to plain JS objects
-
-    return boards.map((board) => ({
-      _id: board._id.toString(),
-      name: board.name,
-    }));
-  } catch (err) {
-    throw new BadRequestException(err.message);
   }
-}
 
-async getBoardMembers(boardId: string, userId: string): Promise<UserDocument[]> {
-  try {
-    const board = await this.trelloBoardModel.findById(boardId).populate('members').exec();
-    const user = await this.userService.findById(userId);
-    if (!user || !user._id) {
-      throw new UnauthorizedException('User not authenticated');
+  async getBoardMembers(boardId: string, userId: string): Promise<UserDocument[]> {
+    try {
+      const board = await this.trelloBoardModel.findById(boardId).populate('members').exec();
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('You are not allowed to view this board members');
+      }
+      return board.members.map((member: any) => {
+        return {
+          _id: member._id.toString(),
+          name: member.name,
+          email: member.email,
+        } as UserDocument;
+      });
+    } catch (err) {
+      throw new BadRequestException(err.message);
     }
-    if (!board) {
-      throw new BadRequestException('Board not found');
-    }
-
-     const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
-
-    // ✅ Check if user is CEO or MANAGER or board member
-    const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
-    const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
-
-    if (!isPrivilegedRole && !isBoardMember) {
-      throw new UnauthorizedException('You are not allowed to view this board members');
-    }
-    return board.members.map((member: any) => {
-      return {
-        _id: member._id.toString(),
-        name: member.name,
-        email: member.email,
-      } as UserDocument;
-    });
-  } catch (err) {
-    throw new BadRequestException(err.message);
   }
-}
+
+  // async createCard(
+  //   name: string,
+  //   listId: string,
+  //   userId: string,
+  //   description?: string,
+  //   assignedUsers?: string[],
+  //   dueDate?: Date,
+  // ): Promise<CardDocument> {
+  //   try {
+  //     const user = await this.userService.findById(userId);
+  //     if (!user || !user._id) {
+  //       throw new UnauthorizedException('User not authenticated');
+  //     }
+
+  //     const list = await this.listModel.findById(listId);
+  //     if (!list) {
+  //       throw new BadRequestException('List not found');
+  //     }
+
+  //     const board = await this.trelloBoardModel.findById(list.board);
+  //     if (!board) {
+  //       throw new BadRequestException('Board not found');
+  //     }
+
+  //     const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+  //     const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+  //     const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+  //     if (!isPrivilegedRole && !isBoardMember) {
+  //       throw new UnauthorizedException('Only board members, CEO, or Manager can create cards');
+  //     }
+
+  //     let assignedUserIds: Types.ObjectId[] = [];
+  //     if (assignedUsers && assignedUsers.length > 0) {
+  //       const users = await this.userService.findByIds(assignedUsers);
+  //       if (users.length !== assignedUsers.length) {
+  //         throw new BadRequestException('Invalid user IDs provided');
+  //       }
+  //       assignedUserIds = users
+  //         .filter((u) =>
+  //           board.members.some((id) => (id as Types.ObjectId).equals(u._id as Types.ObjectId)),
+  //         )
+  //         .map((u) => new Types.ObjectId(u._id as Types.ObjectId));
+  //       if (assignedUserIds.length !== users.length) {
+  //         throw new BadRequestException('One or more users are not members of this board');
+  //       }
+  //     }
+
+  //     const createdCard = new this.cardModel({
+  //       name,
+  //       description,
+  //       assignedUsers: assignedUserIds,
+  //       list: new Types.ObjectId(listId),
+  //       createdBy: userIdObj,
+  //       dueDate: dueDate ? new Date(dueDate) : undefined,
+  //     });
+  //     return await createdCard.save();
+  //   } catch (err) {
+  //     throw new BadRequestException(err.message);
+  //   }
+  // }
+
+  // async updateCard(
+  //   cardId: string,
+  //   userId: string,
+  //   updateData: {
+  //     name?: string;
+  //     description?: string;
+  //     assignedUsers?: string[];
+  //     listId?: string;
+  //     dueDate?: Date;
+  //   },
+  // ): Promise<CardDocument> {
+  //   try {
+  //     const user = await this.userService.findById(userId);
+  //     if (!user || !user._id) {
+  //       throw new UnauthorizedException('User not authenticated');
+  //     }
+
+  //     const card = await this.cardModel.findById(cardId);
+  //     if (!card) {
+  //       throw new BadRequestException('Card not found');
+  //     }
+
+  //     const list = await this.listModel.findById(card.list);
+  //     if (!list) {
+  //       throw new BadRequestException('List not found');
+  //     }
+
+  //     const board = await this.trelloBoardModel.findById(list.board);
+  //     if (!board) {
+  //       throw new BadRequestException('Board not found');
+  //     }
+
+  //     const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+  //     const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+  //     const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+  //     if (!isPrivilegedRole && !isBoardMember) {
+  //       throw new UnauthorizedException('Only board members, CEO, or Manager can update cards');
+  //     }
+
+  //     if (updateData.listId) {
+  //       const newList = await this.listModel.findById(updateData.listId);
+  //       if (!newList) {
+  //         throw new BadRequestException('New list not found');
+  //       }
+  //       if (!newList.board.equals(list.board)) {
+  //         throw new BadRequestException('New list must belong to the same board');
+  //       }
+  //       card.list = new Types.ObjectId(updateData.listId);
+  //     }
+
+  //     if (updateData.assignedUsers && updateData.assignedUsers.length > 0) {
+  //       const users = await this.userService.findByIds(updateData.assignedUsers);
+  //       if (users.length !== updateData.assignedUsers.length) {
+  //         throw new BadRequestException('Invalid user IDs provided');
+  //       }
+  //       const assignedUserIds = users
+  //         .filter((u) =>
+  //           board.members.some((id) => (id as Types.ObjectId).equals(u._id as Types.ObjectId)),
+  //         )
+  //         .map((u) => new Types.ObjectId(u._id as Types.ObjectId));
+  //       if (assignedUserIds.length !== users.length) {
+  //         throw new BadRequestException('One or more users are not members of this board');
+  //       }
+  //       card.assignedUsers = assignedUserIds;
+  //     }
+
+  //     if (updateData.name) card.name = updateData.name;
+  //     if (updateData.description) card.description = updateData.description;
+  //     if (updateData.dueDate !== undefined) {
+  //       card.dueDate = updateData.dueDate ? new Date(updateData.dueDate) : undefined;
+  //     }
+
+  //     return await card.save();
+  //   } catch (err) {
+  //     throw new BadRequestException(err.message);
+  //   }
+  // }
+async createCard(
+    name: string,
+    listId: string,
+    userId: string,
+    description?: string,
+    assignedUsers?: string[],
+    dueDate?: Date,
+  ): Promise<CardDocument> {
+    try {
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      const list = await this.listModel.findById(listId);
+      if (!list) {
+        throw new BadRequestException('List not found');
+      }
+
+      const board = await this.trelloBoardModel.findById(list.board);
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO, or Manager can create cards');
+      }
+
+      let assignedUserIds: Types.ObjectId[] = [];
+      let usersToNotify: UserDocument[] = [];
+      if (assignedUsers && assignedUsers.length > 0) {
+        const users = await this.userService.findByIds(assignedUsers);
+        if (users.length !== assignedUsers.length) {
+          throw new BadRequestException('Invalid user IDs provided');
+        }
+        assignedUserIds = users
+          .filter((u) =>
+            board.members.some((id) => (id as Types.ObjectId).equals(u._id as Types.ObjectId)),
+          )
+          .map((u) => new Types.ObjectId(u._id as Types.ObjectId));
+        if (assignedUserIds.length !== users.length) {
+          throw new BadRequestException('One or more users are not members of this board');
+        }
+        usersToNotify = users;
+      }
+
+      const createdCard = new this.cardModel({
+        name,
+        description,
+        assignedUsers: assignedUserIds,
+        list: new Types.ObjectId(listId),
+        createdBy: userIdObj,
+        dueDate: dueDate ? new Date(dueDate) : undefined,
+      });
+      const savedCard = await createdCard.save();
+
+      for (const assignedUser of usersToNotify) {
+        const cardLink = `http://your-app-domain.com/card/${savedCard._id}`;
+        await this.mailService.sendMail({
+          to: assignedUser.email,
+          subject: `Assigned to Card: ${name} on Board: ${board.name}`,
+          text: `You have been assigned to the card "${name}" on the board "${board.name}" by ${user.name}. Click here to view: ${cardLink}`,
+        });
+      }
+
+      return savedCard;
+    } catch (err) {
+      throw new BadRequestException(err.message);
+    }
+  }
+
+  async updateCard(
+    cardId: string,
+    userId: string,
+    updateData: {
+      name?: string;
+      description?: string;
+      assignedUsers?: string[];
+      listId?: string;
+      dueDate?: Date;
+    },
+  ): Promise<CardDocument> {
+    try {
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      const card = await this.cardModel.findById(cardId);
+      if (!card) {
+        throw new BadRequestException('Card not found');
+      }
+
+      const list = await this.listModel.findById(card.list);
+      if (!list) {
+        throw new BadRequestException('List not found');
+      }
+
+      const board = await this.trelloBoardModel.findById(list.board);
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO, or Manager can update cards');
+      }
+
+      let usersToNotify: UserDocument[] = [];
+      if (updateData.assignedUsers && updateData.assignedUsers.length > 0) {
+        const users = await this.userService.findByIds(updateData.assignedUsers);
+        if (users.length !== updateData.assignedUsers.length) {
+          throw new BadRequestException('Invalid user IDs provided');
+        }
+        const assignedUserIds = users
+          .filter((u) => {
+            if (!u._id) {
+              throw new BadRequestException(`User with ID ${u.id} has no valid _id`);
+            }
+            return board.members.some((id) => (id as Types.ObjectId).equals(u._id as Types.ObjectId));
+          })
+          .map((u) => new Types.ObjectId(u._id as Types.ObjectId));
+        if (assignedUserIds.length !== users.length) {
+          throw new BadRequestException('One or more users are not members of this board');
+        }
+        // Identify newly assigned users
+        const currentAssignedUserIds = card.assignedUsers.map((id) => id.toString());
+        usersToNotify = users.filter((u) => {
+          if (!u._id) {
+            throw new BadRequestException(`User with ID ${u.id} has no valid _id`);
+          }
+          return !currentAssignedUserIds.includes((u._id as Types.ObjectId).toString());
+        });
+        card.assignedUsers = assignedUserIds;
+      }
+
+      if (updateData.listId) {
+        const newList = await this.listModel.findById(updateData.listId);
+        if (!newList) {
+          throw new BadRequestException('New list not found');
+        }
+        if (!newList.board.equals(list.board)) {
+          throw new BadRequestException('New list must belong to the same board');
+        }
+        card.list = new Types.ObjectId(updateData.listId);
+      }
+
+      if (updateData.name) card.name = updateData.name;
+      if (updateData.description) card.description = updateData.description;
+      if (updateData.dueDate !== undefined) {
+        card.dueDate = updateData.dueDate ? new Date(updateData.dueDate) : undefined;
+      }
+
+      const updatedCard = await card.save();
+
+      for (const assignedUser of usersToNotify) {
+        const cardLink = `http://your-app-domain.com/card/${updatedCard._id}`;
+        await this.mailService.sendMail({
+          to: assignedUser.email,
+          subject: `Assigned to Card: ${card.name} on Board: ${board.name}`,
+          text: `You have been assigned to the card "${card.name}" on the board "${board.name}" by ${user.name}. Click here to view: ${cardLink}`,
+        });
+      }
+
+      return updatedCard;
+    } catch (err) {
+      throw new BadRequestException(err.message);
+    }
+  }
+ 
 
 
+  async deleteCard(cardId: string, userId: string): Promise<void> {
+    try {
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
 
+      const card = await this.cardModel.findById(cardId);
+      if (!card) {
+        throw new BadRequestException('Card not found');
+      }
+
+      const list = await this.listModel.findById(card.list);
+      if (!list) {
+        throw new BadRequestException('List not found');
+      }
+
+      const board = await this.trelloBoardModel.findById(list.board);
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO, or Manager can delete cards');
+      }
+
+      await this.cardModel.deleteOne({ _id: cardId });
+    } catch (err) {
+      throw new BadRequestException(err.message);
+    }
+  }
+
+  async getCardDetails(cardId: string, userId: string): Promise<CardDocument> {
+    try {
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+      
+      const card = await this.cardModel.findById(cardId).populate('list').exec();
+      if (!card) {
+        throw new BadRequestException('Card not found');
+      }
+     const list = await this.listModel.findById(card.list);
+      if (!list) {
+        throw new BadRequestException('List not found');
+      }
+      const board = await this.trelloBoardModel.findById(list.board);
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO, or Manager can view card details');
+      }
+
+      return card;
+    } catch (err) {
+      throw new BadRequestException(err.message);
+    }
+  }
 }
