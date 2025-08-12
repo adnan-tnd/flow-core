@@ -14,17 +14,17 @@ export class Project {
   @Prop({ type: String, required: true })
   description: string;
 
-  @Prop({ type: mongooseSchema.Types.ObjectId, required: true })
-  createdBy: mongooseSchema.Types.ObjectId;
+  @Prop({ type: mongooseSchema.Types.ObjectId, required: true, ref: 'User' })
+  createdBy: Types.ObjectId;
 
-  @Prop({ type: mongooseSchema.Types.ObjectId, default: null })
-  projectManager: mongooseSchema.Types.ObjectId | null;
+  @Prop({ type: mongooseSchema.Types.ObjectId, default: null, ref: 'User' })
+  projectManager: Types.ObjectId | null;
 
-  @Prop({ type: [{ type: mongooseSchema.Types.ObjectId }], default: [] })
-  frontendDevs: mongooseSchema.Types.ObjectId[];
+  @Prop({ type: [{ type: mongooseSchema.Types.ObjectId, ref: 'User' }], default: [] })
+  frontendDevs: Types.ObjectId[];
 
-  @Prop({ type: [{ type: mongooseSchema.Types.ObjectId }], default: [] })
-  backendDevs: mongooseSchema.Types.ObjectId[];
+  @Prop({ type: [{ type: mongooseSchema.Types.ObjectId, ref: 'User' }], default: [] })
+  backendDevs: Types.ObjectId[];
 
   @Prop({ type: String, enum: Object.values(ProjectStatus), default: ProjectStatus.ToDo })
   status: string;

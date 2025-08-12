@@ -17,15 +17,5 @@ export class CreateProjectDto {
   @IsMongoId()
   projectManager?: string;
 
-  @ApiProperty({ description: 'Array of frontend developer IDs', type: [String], required: false })
-  @IsOptional()
-  @IsArray()
-  @IsMongoId({ each: true })
-  frontendDevs?: string[];
-
-  @ApiProperty({ description: 'Array of backend developer IDs', type: [String], required: false })
-  @IsOptional()
-  @IsArray()
-  @IsMongoId({ each: true })
-  backendDevs?: string[];
+ 
 }

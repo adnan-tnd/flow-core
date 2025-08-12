@@ -3,6 +3,8 @@ import { ProjectService } from './project.service';
 import { SprintService } from '../sprint/sprint.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { AddMemberDto } from './dto/add-member.dto';
+import { RemoveMemberDto } from './dto/remove-member.dto';
 import { CreateSprintDto } from '../sprint/dto/create-sprint.dto';
 import { UpdateSprintDto } from '../sprint/dto/update-sprint.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -157,5 +159,43 @@ export class ProjectController {
       throw new BadRequestException('Only CEO or Manager can delete projects');
     }
     return this.projectService.deleteProject(id);
+  }
+
+  @Patch(':id/add-members')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Add members to a project (CEO/Manager only)' })
+  @ApiResponse({ status: 200, description: 'Members added successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid input or project not found' })
+  @ApiParam({ name: 'id', description: 'Project ID', type: String })
+  async addMembers(
+    @Param('id') id: string,
+    @Body() dto: AddMemberDto,
+    @Request() req,
+  ) {
+    console.log('Request user:', req.user); // Debug log
+    if (!req.user || ![UserType.CEO, UserType.MANAGER].includes(req.user.type)) {
+      throw new BadRequestException('Only CEO or Manager can add members to projects');
+    }
+    return this.projectService.addMembers(id, dto);
+  }
+
+  @Patch(':id/remove-members')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Remove members from a project (CEO/Manager only)' })
+  @ApiResponse({ status: 200, description: 'Members removed successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid input or project not found' })
+  @ApiParam({ name: 'id', description: 'Project ID', type: String })
+  async removeMembers(
+    @Param('id') id: string,
+    @Body() dto: RemoveMemberDto,
+    @Request() req,
+  ) {
+    console.log('Request user:', req.user); // Debug log
+    if (!req.user || ![UserType.CEO, UserType.MANAGER].includes(req.user.type)) {
+      throw new BadRequestException('Only CEO or Manager can remove members from projects');
+    }
+    return this.projectService.removeMembers(id, dto);
   }
 }

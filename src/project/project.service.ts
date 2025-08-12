@@ -1,9 +1,11 @@
 import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Project, ProjectDocument } from './schemas/project.schema';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { AddMemberDto } from './dto/add-member.dto';
+import { RemoveMemberDto } from './dto/remove-member.dto';
 import { UserService } from '../user/user.service';
 import { UserType } from '../user/types/user';
 import { ProjectStatus } from './types/project';
@@ -30,36 +32,16 @@ export class ProjectService {
       // Validate projectManager if provided
       if (createProjectDto.projectManager) {
         const manager = await this.userService.findById(createProjectDto.projectManager);
-  
-      }
-
-      // Validate frontendDevs if provided
-      if (createProjectDto.frontendDevs?.length) {
-        const uniqueFrontendDevs = new Set(createProjectDto.frontendDevs);
-        if (uniqueFrontendDevs.size !== createProjectDto.frontendDevs.length) {
-          throw new BadRequestException('Duplicate IDs found in frontendDevs');
-        }
-        const frontendUsers = await this.userService.findByIds(createProjectDto.frontendDevs);
-        if (frontendUsers.length !== createProjectDto.frontendDevs.length) {
-          throw new BadRequestException('Invalid frontend developer IDs');
+        if (!manager) {
+          throw new BadRequestException('Invalid project manager ID');
         }
       }
 
-      // Validate backendDevs if provided
-      if (createProjectDto.backendDevs?.length) {
-        const uniqueBackendDevs = new Set(createProjectDto.backendDevs);
-        if (uniqueBackendDevs.size !== createProjectDto.backendDevs.length) {
-          throw new BadRequestException('Duplicate IDs found in backendDevs');
-        }
-        const backendUsers = await this.userService.findByIds(createProjectDto.backendDevs);
-        if (backendUsers.length !== createProjectDto.backendDevs.length) {
-          throw new BadRequestException('Invalid backend developer IDs');
-        }
-      }
+      
 
       const createdProject = new this.projectModel({
         ...createProjectDto,
-        createdBy: userId,
+        createdBy: new Types.ObjectId(userId),
         status: ProjectStatus.ToDo, // Default to 'pending'
       });
       return await createdProject.save();
@@ -106,10 +88,10 @@ export class ProjectService {
       return await this.projectModel
         .find({
           $or: [
-            { createdBy: userId },
-            { projectManager: userId },
-            { frontendDevs: userId },
-            { backendDevs: userId },
+            { createdBy: new Types.ObjectId(userId) },
+            { projectManager: new Types.ObjectId(userId) },
+            { frontendDevs: new Types.ObjectId(userId) },
+            { backendDevs: new Types.ObjectId(userId) },
           ],
         })
         .populate('createdBy', 'name email')
@@ -155,4 +137,95 @@ export class ProjectService {
       throw new BadRequestException(err.message);
     }
   }
+
+  async addMembers(id: string, dto: AddMemberDto): Promise<ProjectDocument> {
+    try {
+      const project = await this.projectModel.findById(id);
+      if (!project) {
+        throw new BadRequestException('Project not found');
+      }
+
+      // Validate frontendDevs if provided
+      if (dto.frontendDevs?.length) {
+        const uniqueFrontendDevs = new Set(dto.frontendDevs);
+        if (uniqueFrontendDevs.size !== dto.frontendDevs.length) {
+          throw new BadRequestException('Duplicate IDs found in frontendDevs');
+        }
+        const frontendUsers = await this.userService.findByIds(dto.frontendDevs);
+        if (frontendUsers.length !== dto.frontendDevs.length) {
+          throw new BadRequestException('Invalid frontend developer IDs');
+        }
+        // Add new frontend devs, avoiding duplicates
+        const existingFrontendDevs = new Set(project.frontendDevs.map(id => id.toString()));
+        const newFrontendDevs = dto.frontendDevs.filter(id => !existingFrontendDevs.has(id));
+        project.frontendDevs = [...project.frontendDevs, ...newFrontendDevs.map(id => new Types.ObjectId(id))];
+      }
+
+      // Validate backendDevs if provided
+      if (dto.backendDevs?.length) {
+        const uniqueBackendDevs = new Set(dto.backendDevs);
+        if (uniqueBackendDevs.size !== dto.backendDevs.length) {
+          throw new BadRequestException('Duplicate IDs found in backendDevs');
+        }
+        const backendUsers = await this.userService.findByIds(dto.backendDevs);
+        if (backendUsers.length !== dto.backendDevs.length) {
+          throw new BadRequestException('Invalid backend developer IDs');
+        }
+        // Add new backend devs, avoiding duplicates
+        const existingBackendDevs = new Set(project.backendDevs.map(id => id.toString()));
+        const newBackendDevs = dto.backendDevs.filter(id => !existingBackendDevs.has(id));
+        project.backendDevs = [...project.backendDevs, ...newBackendDevs.map(id => new Types.ObjectId(id))];
+      }
+      
+      return await project.save();
+    } catch (err) {
+      console.error('Error adding members to project:', err); // Debug log
+      throw new BadRequestException(err.message);
+    }
+  }
+
+
+async removeMembers(id: string, dto: RemoveMemberDto): Promise<ProjectDocument> {
+  try {
+    const project = await this.projectModel.findById(id);
+    if (!project) {
+      throw new BadRequestException('Project not found');
+    }
+
+    // Validate and remove frontendDevs if provided
+    if (dto.frontendDevs && dto.frontendDevs.length > 0) {
+      const uniqueFrontendDevs = new Set(dto.frontendDevs);
+      if (uniqueFrontendDevs.size !== dto.frontendDevs.length) {
+        throw new BadRequestException('Duplicate IDs found in frontendDevs');
+      }
+      const frontendUsers = await this.userService.findByIds(dto.frontendDevs);
+      if (frontendUsers.length !== dto.frontendDevs.length) {
+        throw new BadRequestException('Invalid frontend developer IDs');
+      }
+      project.frontendDevs = project.frontendDevs.filter(
+        id => !dto.frontendDevs!.includes(id.toString())
+      );
+    }
+
+    // Validate and remove backendDevs if provided
+    if (dto.backendDevs && dto.backendDevs.length > 0) {
+      const uniqueBackendDevs = new Set(dto.backendDevs);
+      if (uniqueBackendDevs.size !== dto.backendDevs.length) {
+        throw new BadRequestException('Duplicate IDs found in backendDevs');
+      }
+      const backendUsers = await this.userService.findByIds(dto.backendDevs);
+      if (backendUsers.length !== dto.backendDevs.length) {
+        throw new BadRequestException('Invalid backend developer IDs');
+      }
+      project.backendDevs = project.backendDevs.filter(
+        id => !dto.backendDevs!.includes(id.toString())
+      );
+    }
+
+    return await project.save();
+  } catch (err) {
+    console.error('Error removing members from project:', err); // Debug log
+    throw new BadRequestException(err.message);
+  }
+}
 }

@@ -18,15 +18,7 @@ export class UpdateProjectDto {
   @IsString()
   projectManager?: string;
 
-  @ApiPropertyOptional({ description: 'Frontend developer user IDs', type: [String], example: ['64c8e2f2b8d2a2a5e8b7c123'] })
-  @IsOptional()
-  @IsArray()
-  frontendDevs?: string[];
-
-  @ApiPropertyOptional({ description: 'Backend developer user IDs', type: [String], example: ['64c8e2f2b8d2a2a5e8b7c456'] })
-  @IsOptional()
-  @IsArray()
-  backendDevs?: string[];
+  
 
   @ApiPropertyOptional({ description: 'Project status', enum: ProjectStatus, example: ProjectStatus.ToDo })
   @IsOptional()
