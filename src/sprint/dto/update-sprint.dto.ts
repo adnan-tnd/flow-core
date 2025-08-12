@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsDateString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-
+import { SprintStatus } from '../types/sprint';
 export class UpdateSprintDto {
   @ApiPropertyOptional({ description: 'The name of the sprint', example: 'Sprint 1 Updated' })
   @IsString()
@@ -22,8 +22,8 @@ export class UpdateSprintDto {
   @IsOptional()
   endTime?: string;
 
-  @ApiPropertyOptional({ description: 'The status of the sprint', example: 'In Progress', enum: ['To Do', 'In Progress', 'Done'] })
+  @ApiPropertyOptional({ description: 'The status of the sprint', example: 'In Progress', enum: SprintStatus })
   @IsString()
   @IsOptional()
-  status?: string;
+  status?: SprintStatus;
 }

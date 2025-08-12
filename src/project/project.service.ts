@@ -6,6 +6,7 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UserService } from '../user/user.service';
 import { UserType } from '../user/types/user';
+import { ProjectStatus } from './types/project';
 
 @Injectable()
 export class ProjectService {
@@ -29,7 +30,7 @@ export class ProjectService {
       // Validate projectManager if provided
       if (createProjectDto.projectManager) {
         const manager = await this.userService.findById(createProjectDto.projectManager);
-         
+  
       }
 
       // Validate frontendDevs if provided
@@ -59,6 +60,7 @@ export class ProjectService {
       const createdProject = new this.projectModel({
         ...createProjectDto,
         createdBy: userId,
+        status: ProjectStatus.ToDo, // Default to 'pending'
       });
       return await createdProject.save();
     } catch (err) {
@@ -125,6 +127,10 @@ export class ProjectService {
       const project = await this.projectModel.findById(id);
       if (!project) {
         throw new BadRequestException('Project not found');
+      }
+      // Validate status if provided
+      if (dto.status && !Object.values(ProjectStatus).includes(dto.status)) {
+        throw new BadRequestException('Invalid status value');
       }
       // Only assign fields that are defined in dto
       Object.keys(dto).forEach((key) => {

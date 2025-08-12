@@ -1,5 +1,6 @@
-import { IsOptional, IsString, IsArray } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsEnum } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ProjectStatus } from '../types/project';
 
 export class UpdateProjectDto {
   @ApiPropertyOptional({ description: 'Project name', example: 'My Project' })
@@ -26,4 +27,9 @@ export class UpdateProjectDto {
   @IsOptional()
   @IsArray()
   backendDevs?: string[];
+
+  @ApiPropertyOptional({ description: 'Project status', enum: ProjectStatus, example: ProjectStatus.ToDo })
+  @IsOptional()
+  @IsEnum(ProjectStatus)
+  status?: ProjectStatus;
 }
