@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, IsDateString } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsDateString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateCardDto {
@@ -28,17 +28,6 @@ export class CreateCardDto {
   @IsOptional()
   @IsString()
   description?: string;
-
-  @ApiProperty({
-    description: 'Array of user IDs assigned to the card (must be board members)',
-    example: ['60d1f8b3c4d5e6f7890abc12', '60d1f8b3c4d5e6f7890abc34'],
-    required: false,
-    type: [String],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  assignedUsers?: string[];
 
   @ApiProperty({
     description: 'The due date for the card in ISO 8601 format',
