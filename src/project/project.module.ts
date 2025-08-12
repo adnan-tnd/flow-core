@@ -6,13 +6,15 @@ import { ProjectController } from './project.controller';
 import { UserModule } from '../user/user.module';
 import { SprintModule } from '../sprint/sprint.module';
 import { MailModule } from '../mail/mail.module';
+import { TrelloBoardModule } from '../trello-board/trello-board.module'; // ✅ Import the module, not the service
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Project.name, schema: ProjectSchema }]),
     UserModule,
     MailModule,
-    forwardRef(() => SprintModule), // Use forwardRef to avoid circular dependency
+    forwardRef(() => TrelloBoardModule), // ✅ Fixed
+    forwardRef(() => SprintModule), // ✅ Still using forwardRef for circular deps
   ],
   controllers: [ProjectController],
   providers: [ProjectService],

@@ -1,5 +1,5 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, IsMongoId } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional, IsMongoId, IsArray } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateProjectDto {
   @ApiProperty({ description: 'Name of the project' })
@@ -17,5 +17,23 @@ export class CreateProjectDto {
   @IsMongoId()
   projectManager?: string;
 
- 
+  @ApiPropertyOptional({
+    description: 'List of frontend developer IDs (MongoDB ObjectId array)',
+    example: ['64d23f9a4f1b2e6b3c8d1235', '64d23f9a4f1b2e6b3c8d1236'],
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  frontendDevs: string[] = [];
+
+  @ApiPropertyOptional({
+    description: 'List of backend developer IDs (MongoDB ObjectId array)',
+    example: ['64d23f9a4f1b2e6b3c8d1237', '64d23f9a4f1b2e6b3c8d1238'],
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  backendDevs: string[] = [];
 }

@@ -3,6 +3,7 @@ import { Document, Types } from 'mongoose';
 import { Schema as mongooseSchema } from 'mongoose';
 import { ProjectStatus } from '../types/project';
 import { User } from 'src/user/schemas/user.schema';
+import { TrelloBoard } from 'src/trello-board/schemas/trello-board.schema';
 
 export type ProjectDocument = Project & Document;
 
@@ -28,6 +29,9 @@ export class Project {
 
   @Prop({ type: String, enum: Object.values(ProjectStatus), default: ProjectStatus.ToDo })
   status: string;
+
+  @Prop({ type: mongooseSchema.Types.ObjectId, ref: 'TrelloBoard', default: null })
+  trelloBoardId: Types.ObjectId | null;
 }
 
 export const ProjectSchema = SchemaFactory.createForClass(Project);

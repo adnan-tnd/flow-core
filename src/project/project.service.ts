@@ -8,8 +8,10 @@ import { AddMemberDto } from './dto/add-member.dto';
 import { RemoveMemberDto } from './dto/remove-member.dto';
 import { UserService } from '../user/user.service';
 import { MailService } from '../mail/mail.service';
+import { TrelloBoardService } from '../trello-board/trello-board.service';
 import { UserType } from '../user/types/user';
 import { ProjectStatus } from './types/project';
+import { TrelloBoardDocument } from '../trello-board/schemas/trello-board.schema';
 
 @Injectable()
 export class ProjectService {
@@ -18,6 +20,7 @@ export class ProjectService {
     private projectModel: Model<ProjectDocument>,
     private userService: UserService,
     private mailService: MailService,
+    private trelloBoardService: TrelloBoardService,
   ) {}
 
   async create(createProjectDto: CreateProjectDto, userId: string): Promise<ProjectDocument> {
@@ -32,19 +35,47 @@ export class ProjectService {
       }
 
       // Validate projectManager if provided
-      if (createProjectDto.projectManager) {
-        const manager = await this.userService.findById(createProjectDto.projectManager);
-        if (!manager) {
-          throw new BadRequestException('Invalid project manager ID');
-        }
-      }
+      // if (createProjectDto.projectManager) {
+      //   const manager = await this.userService.findById(createProjectDto.projectManager);
+      //   // if (!manager) {
+      //   //   throw new BadRequestException('Invalid project manager ID');
+      //   // }
+      // }
 
+      // Create project
       const createdProject = new this.projectModel({
         ...createProjectDto,
         createdBy: new Types.ObjectId(userId),
-        status: ProjectStatus.ToDo, // Default to 'pending'
+        status: ProjectStatus.ToDo,
+        frontendDevs: createProjectDto.frontendDevs.map(id => new Types.ObjectId(id)), // Convert strings to ObjectIds
+        backendDevs: createProjectDto.backendDevs.map(id => new Types.ObjectId(id)), // Convert strings to ObjectIds
       });
-      return await createdProject.save();
+
+      // Save project to get its ID
+      const savedProject = await createdProject.save();
+
+      // Create Trello board with the same name
+      const trelloBoard: TrelloBoardDocument = await this.trelloBoardService.create(savedProject.name, userId);
+
+      // Collect all member IDs (creator, project manager, frontend devs, backend devs)
+      const memberIds: string[] = [userId];
+      if (createProjectDto.projectManager) {
+        memberIds.push(createProjectDto.projectManager);
+      }
+      memberIds.push(...createProjectDto.frontendDevs);
+      memberIds.push(...createProjectDto.backendDevs);
+
+      // Add unique members to the Trello board
+      const uniqueMemberIds = [...new Set(memberIds)];
+      if (uniqueMemberIds.length > 0) {
+        await this.trelloBoardService.addUsers(trelloBoard.id.toString(), uniqueMemberIds, userId);
+      }
+
+      // Update project with Trello board ID
+      savedProject.trelloBoardId = trelloBoard.id; // Direct assignment since _id is Types.ObjectId
+      await savedProject.save();
+
+      return savedProject;
     } catch (err) {
       console.error('Error creating project:', err); // Debug log
       throw new BadRequestException(err.message);
@@ -59,6 +90,7 @@ export class ProjectService {
         .populate('projectManager', 'name email')
         .populate('frontendDevs', 'name email')
         .populate('backendDevs', 'name email')
+        .populate('trelloBoardId', 'name') // Populate trelloBoardId
         .exec();
     } catch (err) {
       throw new BadRequestException(err.message);
@@ -73,6 +105,7 @@ export class ProjectService {
         .populate('projectManager', 'name email')
         .populate('frontendDevs', 'name email')
         .populate('backendDevs', 'name email')
+        .populate('trelloBoardId', 'name') // Populate trelloBoardId
         .exec();
       if (!project) {
         throw new BadRequestException('Project not found');
@@ -98,6 +131,7 @@ export class ProjectService {
         .populate('projectManager', 'name email')
         .populate('frontendDevs', 'name email')
         .populate('backendDevs', 'name email')
+        .populate('trelloBoardId', 'name') // Populate trelloBoardId
         .exec();
     } catch (err) {
       throw new BadRequestException(err.message);
@@ -174,6 +208,10 @@ export class ProjectService {
             text: `Hello ${user.name},\n\nYou have been added to the project "${project.name}" as a frontend developer by ${actor.name}.\n\nBest regards,\nProject Management Team`,
           });
         }
+        // Add new frontend devs to Trello board
+        if (newFrontendDevs.length > 0 && project.trelloBoardId) {
+          await this.trelloBoardService.addUsers(project.trelloBoardId.toString(), newFrontendDevs, actorId);
+        }
       }
 
       // Validate backendDevs if provided
@@ -198,6 +236,10 @@ export class ProjectService {
             subject: `Added to Project: ${project.name}`,
             text: `Hello ${user.name},\n\nYou have been added to the project "${project.name}" as a backend developer by ${actor.name}.\n\nBest regards,\nProject Management Team`,
           });
+        }
+        // Add new backend devs to Trello board
+        if (newBackendDevs.length > 0 && project.trelloBoardId) {
+          await this.trelloBoardService.addUsers(project.trelloBoardId.toString(), newBackendDevs, actorId);
         }
       }
 

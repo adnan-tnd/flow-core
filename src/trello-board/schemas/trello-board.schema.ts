@@ -33,5 +33,5 @@ export class TrelloBoard {
   @Prop({ type: [PendingInvitation], default: [] })
   pendingInvitations: PendingInvitation[];
 }
-
+ 
 export const TrelloBoardSchema = SchemaFactory.createForClass(TrelloBoard);
