@@ -1,5 +1,6 @@
+// src/trello-board/dto/add-attachments.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
-import { MulterField as Multer } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
+
 export class AddAttachmentsDto {
   @ApiProperty({
     type: 'array',

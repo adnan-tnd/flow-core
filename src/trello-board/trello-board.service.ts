@@ -228,30 +228,50 @@ export class TrelloBoardService {
     }
   }
 
-  async addAttachmentsToCard(
-    cardId: string,
+  async addAttachments(
+    id: string,
     files: Express.Multer.File[],
     userId: string,
-  ): Promise<CardDocument> {
+  ): Promise<CardDocument | CommentDocument> {
     try {
       const user = await this.userService.findById(userId);
       if (!user || !user._id) {
         throw new UnauthorizedException('User not authenticated');
       }
 
-      const card = await this.cardModel.findById(cardId);
-      if (!card) {
-        throw new BadRequestException('Card not found');
-      }
+      let card: CardDocument | null = null;
+      let comment: CommentDocument | null = null;
+      let list: ListDocument | null = null;
+      let board: TrelloBoardDocument | null = null;
 
-      const list = await this.listModel.findById(card.list);
-      if (!list) {
-        throw new BadRequestException('List not found');
-      }
-
-      const board = await this.trelloBoardModel.findById(list.board);
-      if (!board) {
-        throw new BadRequestException('Board not found');
+      // Check if id corresponds to a card or a comment
+      card = await this.cardModel.findById(id);
+      if (card) {
+        list = await this.listModel.findById(card.list);
+        if (!list) {
+          throw new BadRequestException('List not found');
+        }
+        board = await this.trelloBoardModel.findById(list.board);
+        if (!board) {
+          throw new BadRequestException('Board not found');
+        }
+      } else {
+        comment = await this.commentModel.findById(id);
+        if (!comment) {
+          throw new BadRequestException('Neither card nor comment found for the provided ID');
+        }
+        card = await this.cardModel.findById(comment.card);
+        if (!card) {
+          throw new BadRequestException('Card not found for the comment');
+        }
+        list = await this.listModel.findById(card.list);
+        if (!list) {
+          throw new BadRequestException('List not found');
+        }
+        board = await this.trelloBoardModel.findById(list.board);
+        if (!board) {
+          throw new BadRequestException('Board not found');
+        }
       }
 
       const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
@@ -259,7 +279,7 @@ export class TrelloBoardService {
       const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
 
       if (!isPrivilegedRole && !isBoardMember) {
-        throw new UnauthorizedException('Only board members, CEO, or Manager can add attachments to cards');
+        throw new UnauthorizedException('Only board members, CEO, or Manager can add attachments');
       }
 
       if (!files || files.length === 0) {
@@ -268,8 +288,9 @@ export class TrelloBoardService {
 
       const maxFileSize = 5 * 1024 * 1024;
       const maxAttachments = 10;
-      if (card.attachments.length + files.length > maxAttachments) {
-        throw new BadRequestException(`Cannot add more than ${maxAttachments} attachments to a card`);
+      const target = comment || card;
+      if (target.attachments.length + files.length > maxAttachments) {
+        throw new BadRequestException(`Cannot add more than ${maxAttachments} attachments to a ${comment ? 'comment' : 'card'}`);
       }
 
       const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif'];
@@ -288,9 +309,10 @@ export class TrelloBoardService {
 
       const uploadPromises = files.map(async (file) => {
         return new Promise<string>((resolve, reject) => {
+          const folder = comment ? `comments/${id}` : `cards/${id}`;
           const uploader = cloudinary.uploader.upload_stream(
             {
-              folder: `cards/${cardId}`,
+              folder,
               resource_type: 'image',
               public_id: `${uuidv4()}-${file.originalname.replace(/\.[^/.]+$/, '')}`,
             },
@@ -315,43 +337,63 @@ export class TrelloBoardService {
         throw new BadRequestException(`Failed to upload file: ${(error as Error).message}`);
       }
 
-      card.attachments = [...card.attachments, ...attachmentUrls];
-      const updatedCard = await card.save();
+      target.attachments = [...target.attachments, ...attachmentUrls];
+      const updatedTarget = await target.save();
 
-      return updatedCard;
+      return updatedTarget;
     } catch (err) {
-      console.error('Error in addAttachmentsToCard:', err);
+      console.error('Error in addAttachments:', err);
       if (err instanceof UnauthorizedException || err instanceof BadRequestException) {
         throw err;
       }
-      throw new BadRequestException('Failed to add attachments to card');
+      throw new BadRequestException('Failed to add attachments');
     }
   }
 
-  async removeAttachmentsFromCard(
-    cardId: string,
+  async removeAttachments(
+    id: string,
     attachmentUrls: string[],
     userId: string,
-  ): Promise<CardDocument> {
+  ): Promise<CardDocument | CommentDocument> {
     try {
       const user = await this.userService.findById(userId);
       if (!user || !user._id) {
         throw new UnauthorizedException('User not authenticated');
       }
 
-      const card = await this.cardModel.findById(cardId);
-      if (!card) {
-        throw new BadRequestException('Card not found');
-      }
+      let card: CardDocument | null = null;
+      let comment: CommentDocument | null = null;
+      let list: ListDocument | null = null;
+      let board: TrelloBoardDocument | null = null;
 
-      const list = await this.listModel.findById(card.list);
-      if (!list) {
-        throw new BadRequestException('List not found');
-      }
-
-      const board = await this.trelloBoardModel.findById(list.board);
-      if (!board) {
-        throw new BadRequestException('Board not found');
+      // Check if id corresponds to a card or a comment
+      card = await this.cardModel.findById(id);
+      if (card) {
+        list = await this.listModel.findById(card.list);
+        if (!list) {
+          throw new BadRequestException('List not found');
+        }
+        board = await this.trelloBoardModel.findById(list.board);
+        if (!board) {
+          throw new BadRequestException('Board not found');
+        }
+      } else {
+        comment = await this.commentModel.findById(id);
+        if (!comment) {
+          throw new BadRequestException('Neither card nor comment found for the provided ID');
+        }
+        card = await this.cardModel.findById(comment.card);
+        if (!card) {
+          throw new BadRequestException('Card not found for the comment');
+        }
+        list = await this.listModel.findById(card.list);
+        if (!list) {
+          throw new BadRequestException('List not found');
+        }
+        board = await this.trelloBoardModel.findById(list.board);
+        if (!board) {
+          throw new BadRequestException('Board not found');
+        }
       }
 
       const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
@@ -359,28 +401,29 @@ export class TrelloBoardService {
       const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
 
       if (!isPrivilegedRole && !isBoardMember) {
-        throw new UnauthorizedException('Only board members, CEO, or Manager can remove attachments from cards');
+        throw new UnauthorizedException('Only board members, CEO, or Manager can remove attachments');
       }
 
       if (!attachmentUrls || attachmentUrls.length === 0) {
         throw new BadRequestException('No attachment URLs provided');
       }
 
-      const invalidUrls = attachmentUrls.filter(url => !card.attachments.includes(url));
+      const target = comment || card;
+      const invalidUrls = attachmentUrls.filter((url) => !target.attachments.includes(url));
       if (invalidUrls.length > 0) {
         throw new BadRequestException('One or more attachment URLs are invalid or not found');
       }
 
-      card.attachments = card.attachments.filter(url => !attachmentUrls.includes(url));
-      const updatedCard = await card.save();
+      target.attachments = target.attachments.filter((url) => !attachmentUrls.includes(url));
+      const updatedTarget = await target.save();
 
-      return updatedCard;
+      return updatedTarget;
     } catch (err) {
-      console.error('Error in removeAttachmentsFromCard:', err);
+      console.error('Error in removeAttachments:', err);
       if (err instanceof UnauthorizedException || err instanceof BadRequestException) {
         throw err;
       }
-      throw new BadRequestException('Failed to remove attachments from card');
+      throw new BadRequestException('Failed to remove attachments');
     }
   }
 

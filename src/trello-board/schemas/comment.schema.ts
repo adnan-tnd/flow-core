@@ -1,3 +1,4 @@
+// src/trello-board/schemas/comment.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { Schema as mongooseSchema } from 'mongoose';
@@ -15,6 +16,9 @@ export class Comment {
 
   @Prop({ default: Date.now })
   time: Date;
+
+  @Prop({ type: [String], default: [] })
+  attachments: string[];
 }
 
 export type CommentDocument = Comment & Document;

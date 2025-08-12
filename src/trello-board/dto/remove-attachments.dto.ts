@@ -1,13 +1,13 @@
+// src/trello-board/dto/remove-attachments.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsUrl } from 'class-validator';
+import { IsArray, IsString } from 'class-validator';
 
 export class RemoveAttachmentsDto {
   @ApiProperty({
-    description: 'Array of attachment URLs to remove from the card',
     type: [String],
-    example: ['https://res.cloudinary.com/example/image1.jpg', 'https://res.cloudinary.com/example/image2.jpg'],
+    description: 'List of attachment URLs to remove',
   })
   @IsArray()
-  @IsUrl({}, { each: true })
+  @IsString({ each: true })
   attachmentUrls: string[];
 }

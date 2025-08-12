@@ -325,49 +325,49 @@ export class TrelloBoardController {
     return this.trelloBoardService.getCardDetails(cardId, req.user.sub);
   }
 
-  @Post('add-attachments/:cardId')
+ @Post('add-attachments/:id')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 10 }]))
-  @ApiOperation({ summary: 'Add attachments to a card' })
+  @ApiOperation({ summary: 'Add attachments to a card or comment' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Attachments added successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
-  @ApiParam({ name: 'cardId', description: 'Card ID', type: String })
+  @ApiParam({ name: 'id', description: 'Card or Comment ID', type: String })
   @ApiBody({
     description: 'Upload multiple image files',
     type: AddAttachmentsDto,
   })
-  async addAttachmentsToCard(
-    @Param('cardId') cardId: string,
+  async addAttachments(
+    @Param('id') id: string,
     @UploadedFiles() files: { files?: Express.Multer.File[] },
     @Request() req,
   ) {
     if (!req.user || !req.user.sub) {
       throw new UnauthorizedException('User not authenticated');
     }
-    return this.trelloBoardService.addAttachmentsToCard(cardId, files.files || [], req.user.sub);
+    return this.trelloBoardService.addAttachments(id, files.files || [], req.user.sub);
   }
 
-  @Post('remove-attachments/:cardId')
+  @Post('remove-attachments/:id')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Remove attachments from a card' })
+  @ApiOperation({ summary: 'Remove attachments from a card or comment' })
   @ApiResponse({ status: 200, description: 'Attachments removed successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
-  @ApiParam({ name: 'cardId', description: 'Card ID', type: String })
+  @ApiParam({ name: 'id', description: 'Card or Comment ID', type: String })
   @ApiBody({
     description: 'List of attachment URLs to remove',
     type: RemoveAttachmentsDto,
   })
-  async removeAttachmentsFromCard(
-    @Param('cardId') cardId: string,
+  async removeAttachments(
+    @Param('id') id: string,
     @Body() dto: RemoveAttachmentsDto,
     @Request() req,
   ) {
     if (!req.user || !req.user.sub) {
       throw new UnauthorizedException('User not authenticated');
     }
-    return this.trelloBoardService.removeAttachmentsFromCard(cardId, dto.attachmentUrls, req.user.sub);
+    return this.trelloBoardService.removeAttachments(id, dto.attachmentUrls, req.user.sub);
   }
 }
