@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { TrelloBoard, TrelloBoardDocument } from './schemas/trello-board.schema';
 import { Card, CardDocument } from './schemas/card.schema';
 import { List, ListDocument } from './schemas/list.schema';
+import { Comment, CommentDocument } from './schemas/comment.schema';
 import { UserService } from '../user/user.service';
 import { MailService } from '../mail/mail.service';
 import { UserType } from '../user/types/user';
@@ -29,6 +30,8 @@ export class TrelloBoardService {
     private listModel: Model<ListDocument>,
     @InjectModel(Card.name)
     private cardModel: Model<CardDocument>,
+    @InjectModel(Comment.name)
+    private commentModel: Model<CommentDocument>,
     private userService: UserService,
     private mailService: MailService,
     private configService: ConfigService,
@@ -38,6 +41,191 @@ export class TrelloBoardService {
       api_key: this.configService.get<string>('CLOUDINARY_API_KEY'),
       api_secret: this.configService.get<string>('CLOUDINARY_API_SECRET'),
     });
+  }
+
+  async addComment(
+    cardId: string,
+    text: string,
+    userId: string,
+  ): Promise<CommentDocument> {
+    try {
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      const card = await this.cardModel.findById(cardId);
+      if (!card) {
+        throw new BadRequestException('Card not found');
+      }
+
+      const list = await this.listModel.findById(card.list);
+      if (!list) {
+        throw new BadRequestException('List not found');
+      }
+
+      const board = await this.trelloBoardModel.findById(list.board);
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO, or Manager can add comments to cards');
+      }
+
+      const createdComment = new this.commentModel({
+        commentBy: userIdObj,
+        text,
+        card: new Types.ObjectId(cardId),
+        time: new Date(),
+      });
+
+      return await createdComment.save();
+    } catch (err) {
+      console.error('Error in addComment:', err);
+      throw new BadRequestException(err.message);
+    }
+  }
+
+  async updateComment(
+    commentId: string,
+    text: string,
+    userId: string,
+  ): Promise<CommentDocument> {
+    try {
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      const comment = await this.commentModel.findById(commentId);
+      if (!comment) {
+        throw new BadRequestException('Comment not found');
+      }
+
+      const card = await this.cardModel.findById(comment.card);
+      if (!card) {
+        throw new BadRequestException('Card not found');
+      }
+
+      const list = await this.listModel.findById(card.list);
+      if (!list) {
+        throw new BadRequestException('List not found');
+      }
+
+      const board = await this.trelloBoardModel.findById(list.board);
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO, or Manager can update comments');
+      }
+
+      if (!comment.commentBy.equals(userIdObj) && !isPrivilegedRole) {
+        throw new UnauthorizedException('Only the comment creator or privileged users can update this comment');
+      }
+
+      comment.text = text;
+      return await comment.save();
+    } catch (err) {
+      console.error('Error in updateComment:', err);
+      throw new BadRequestException(err.message);
+    }
+  }
+
+  async getComments(cardId: string, userId: string,): Promise<CommentDocument[]> { 
+    try { 
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      const card = await this.cardModel.findById(cardId);     
+      if (!card) { 
+        throw new BadRequestException('Card not found');
+      } 
+      const list = await this.listModel.findById(card.list);
+      if (!list) {
+        throw new BadRequestException('List not found');
+      }      
+      const board = await this.trelloBoardModel.findById(list.board);
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO, or Manager can add comments to cards');
+      }
+      const comments = await this.commentModel
+        .find({ card: cardId })
+        .populate('commentBy', 'name email') // Populate user details
+        .sort({ time: -1 }) // Sort by time in descending order
+        .exec();
+      return comments;      
+    } catch (err) {
+      console.error('Error in getComments:', err);
+
+      throw new BadRequestException(err.message);
+    }
+  }
+
+
+  async deleteComment(commentId: string, userId: string): Promise<void> {
+    try {
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      const comment = await this.commentModel.findById(commentId);
+      if (!comment) {
+        throw new BadRequestException('Comment not found');
+      }
+
+      const card = await this.cardModel.findById(comment.card);
+      if (!card) {
+        throw new BadRequestException('Card not found');
+      }
+
+      const list = await this.listModel.findById(card.list);
+      if (!list) {
+        throw new BadRequestException('List not found');
+      }
+
+      const board = await this.trelloBoardModel.findById(list.board);
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO, or Manager can delete comments');
+      }
+
+      if (!comment.commentBy.equals(userIdObj) && !isPrivilegedRole) {
+        throw new UnauthorizedException('Only the comment creator or privileged users can delete this comment');
+      }
+
+      await this.commentModel.deleteOne({ _id: commentId });
+    } catch (err) {
+      console.error('Error in deleteComment:', err);
+      throw new BadRequestException(err.message);
+    }
   }
 
   async addAttachmentsToCard(

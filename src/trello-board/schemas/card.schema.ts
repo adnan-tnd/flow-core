@@ -32,5 +32,7 @@ export class Card extends Document {
   cardNumber: number;
 }
 
+   
+
 export type CardDocument = Card & Document;
 export const CardSchema = SchemaFactory.createForClass(Card);

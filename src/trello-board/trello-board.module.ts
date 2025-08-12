@@ -7,13 +7,14 @@ import { TrelloBoardService } from './trello-board.service';
 import { TrelloBoardController } from './trello-board.controller';
 import { UserModule } from '../user/user.module';
 import { MailModule } from '../mail/mail.module';
-
+import { Comment, CommentSchema } from './schemas/comment.schema';
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: TrelloBoard.name, schema: TrelloBoardSchema },
       { name: List.name, schema: ListSchema },
       { name: Card.name, schema: CardSchema },
+      { name: Comment.name, schema: CommentSchema }
     ]),
     UserModule,
     MailModule,

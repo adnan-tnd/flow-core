@@ -13,12 +13,81 @@ import { AddMembersDto } from './dto/add-members.dto';
 import { RemoveMembersDto } from './dto/remove-members.dto';
 import { AddAttachmentsDto } from './dto/add-attachments.dto';
 import { RemoveAttachmentsDto } from './dto/remove-attachments.dto';
+import { AddCommentDto } from 'src/trello-board/dto/add-comment.dto';
+import { UpdateCommentDto } from 'src/trello-board/dto/update-comment.dto';
 
 @ApiTags('trello-board')
 @ApiBearerAuth('JWT')
 @Controller('trello-board')
 export class TrelloBoardController {
   constructor(private readonly trelloBoardService: TrelloBoardService) {}
+
+  @Post('add-comment/:cardId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Add a comment to a card' })
+  @ApiResponse({ status: 200, description: 'Comment added successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiParam({ name: 'cardId', description: 'Card ID', type: String })
+  @ApiBody({ type: AddCommentDto })
+  async addComment(
+    @Param('cardId') cardId: string,
+    @Body() dto: AddCommentDto,
+    @Request() req,
+  ) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    return this.trelloBoardService.addComment(cardId, dto.text, req.user.sub);
+  }
+  
+  @Get('comments/:cardId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get all comments for a card' })
+  @ApiResponse({ status: 200, description: 'Comments fetched successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiParam({ name: 'cardId', description: 'Card ID', type: String })
+  async getComments(@Param('cardId') cardId: string, @Request() req) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    return this.trelloBoardService.getComments(cardId, req.user.sub);
+  }
+
+
+  @Post('update-comment/:commentId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Update a comment on a card' })
+  @ApiResponse({ status: 200, description: 'Comment updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiParam({ name: 'commentId', description: 'Comment ID', type: String })
+  @ApiBody({ type: UpdateCommentDto })
+  async updateComment(
+    @Param('commentId') commentId: string,
+    @Body() dto: UpdateCommentDto,
+    @Request() req,
+  ) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    return this.trelloBoardService.updateComment(commentId, dto.text, req.user.sub);
+  }
+
+  @Delete('delete-comment/:commentId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Delete a comment from a card' })
+  @ApiResponse({ status: 200, description: 'Comment deleted successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiParam({ name: 'commentId', description: 'Comment ID', type: String })
+  async deleteComment(@Param('commentId') commentId: string, @Request() req) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    await this.trelloBoardService.deleteComment(commentId, req.user.sub);
+    return { message: 'Comment deleted successfully' };
+  }
 
   @Post('create')
   @UseGuards(JwtAuthGuard)
@@ -160,25 +229,30 @@ export class TrelloBoardController {
     return this.trelloBoardService.removeMembersFromCard(cardId, dto.userIds, req.user.sub);
   }
 
- @Post('update-card/:cardId')
-       @UseGuards(JwtAuthGuard)
-       async updateCard(
-         @Param('cardId') cardId: string,
-         @Body() dto: UpdateCardDto,
-         @Request() req,
-       ) {
-         console.log('Controller received DTO:', dto);
-         if (!req.user || !req.user.sub) {
-           throw new UnauthorizedException('User not authenticated');
-         }
-         return this.trelloBoardService.updateCard(cardId, req.user.sub, {
-           name: dto.name,
-           description: dto.description,
-           listId: dto.listId,
-           dueDate: dto.dueDate,
-           status: dto.status,
-         });
-       }
+  @Post('update-card/:cardId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Update a card on a Trello board list' })
+  @ApiResponse({ status: 200, description: 'Card updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiParam({ name: 'cardId', description: 'Card ID', type: String })
+  async updateCard(
+    @Param('cardId') cardId: string,
+    @Body() dto: UpdateCardDto,
+    @Request() req,
+  ) {
+    console.log('Controller received DTO:', dto);
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    return this.trelloBoardService.updateCard(cardId, req.user.sub, {
+      name: dto.name,
+      description: dto.description,
+      listId: dto.listId,
+      dueDate: dto.dueDate,
+      status: dto.status,
+    });
+  }
 
   @Delete('delete-card/:cardId')
   @UseGuards(JwtAuthGuard)
