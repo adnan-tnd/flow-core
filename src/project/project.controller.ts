@@ -27,7 +27,7 @@ export class ProjectController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
   async create(@Body() dto: CreateProjectDto, @Request() req) {
-    console.log('Request user:', req.user); // Debug log
+    console.log('Request user:', req.user);
     if (!req.user || !req.user.sub) {
       throw new UnauthorizedException('User not authenticated');
     }
@@ -91,8 +91,9 @@ export class ProjectController {
   @ApiOperation({ summary: 'Get all projects (CEO/Manager only)' })
   @ApiResponse({ status: 200, description: 'List of all projects' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Only CEO or Manager can view all projects' })
   async findAll(@Request() req) {
-    console.log('Request user:', req.user); // Debug log
+    console.log('Request user:', req.user);
     if (!req.user || ![UserType.CEO, UserType.MANAGER].includes(req.user.type)) {
       throw new BadRequestException('Only CEO or Manager can view all projects');
     }
@@ -105,7 +106,7 @@ export class ProjectController {
   @ApiResponse({ status: 200, description: 'List of user projects' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async myProjects(@Request() req) {
-    console.log('Request user:', req.user); // Debug log
+    console.log('Request user:', req.user);
     if (!req.user || !req.user.sub) {
       throw new UnauthorizedException('User not authenticated');
     }
@@ -153,8 +154,9 @@ export class ProjectController {
   @ApiResponse({ status: 200, description: 'Project deleted successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiParam({ name: 'id', description: 'Project ID', type: String })
   async delete(@Param('id') id: string, @Request() req) {
-    console.log('Request user:', req.user); // Debug log
+    console.log('Request user:', req.user);
     if (!req.user || ![UserType.CEO, UserType.MANAGER].includes(req.user.type)) {
       throw new BadRequestException('Only CEO or Manager can delete projects');
     }
@@ -203,5 +205,22 @@ export class ProjectController {
       throw new BadRequestException('Only CEO or Manager can remove members from projects');
     }
     return this.projectService.removeMembers(id, dto, req.user.sub);
+  }
+
+  @Get('stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get statistics for all projects (CEO/Manager only)' })
+  @ApiResponse({ status: 200, description: 'Project statistics fetched successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Only CEO or Manager can view project stats' })
+  async getAllProjectStats(@Request() req) {
+    console.log('Request user:', req.user);
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    if (!req.user || ![UserType.CEO, UserType.MANAGER].includes(req.user.type)) {
+      throw new BadRequestException('Only CEO or Manager can view project stats');
+    }
+    return this.projectService.getAllProjectStats(req.user.sub);
   }
 }
