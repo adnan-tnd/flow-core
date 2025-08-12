@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+
+import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { TrelloBoard, TrelloBoardDocument } from './schemas/trello-board.schema';
@@ -10,6 +11,15 @@ import { UserType } from '../user/types/user';
 import { v4 as uuidv4 } from 'uuid';
 import { Types } from 'mongoose';
 import { UserDocument } from '../user/schemas/user.schema';
+import { ConfigService } from '@nestjs/config';
+import { v2 as cloudinary } from 'cloudinary';
+import * as stream from 'stream';
+
+// Define a type for Cloudinary upload result to fix TypeScript redline
+interface CloudinaryUploadResult {
+  secure_url: string;
+  [key: string]: any; // Allow other properties
+}
 
 @Injectable()
 export class TrelloBoardService {
@@ -22,8 +32,120 @@ export class TrelloBoardService {
     private cardModel: Model<CardDocument>,
     private userService: UserService,
     private mailService: MailService,
-  ) {}
+    private configService: ConfigService,
+  ) {
+    cloudinary.config({
+      cloud_name: this.configService.get<string>('CLOUDINARY_CLOUD_NAME'),
+      api_key: this.configService.get<string>('CLOUDINARY_API_KEY'),
+      api_secret: this.configService.get<string>('CLOUDINARY_API_SECRET'),
+    });
+  }
 
+  async addAttachmentsToCard(
+    cardId: string,
+    files: Express.Multer.File[],
+    userId: string,
+  ): Promise<CardDocument> {
+    try {
+      // Validate user and permissions
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      const card = await this.cardModel.findById(cardId);
+      if (!card) {
+        throw new BadRequestException('Card not found');
+      }
+
+      const list = await this.listModel.findById(card.list);
+      if (!list) {
+        throw new BadRequestException('List not found');
+      }
+
+      const board = await this.trelloBoardModel.findById(list.board);
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO, or Manager can add attachments to cards');
+      }
+
+      // Validate files
+      if (!files || files.length === 0) {
+        throw new BadRequestException('No files provided');
+      }
+
+      const maxFileSize = 5 * 1024 * 1024; // 5MB limit
+      const maxAttachments = 10; // Example limit
+      if (card.attachments.length + files.length > maxAttachments) {
+        throw new BadRequestException(`Cannot add more than ${maxAttachments} attachments to a card`);
+      }
+
+      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif'];
+      for (const file of files) {
+        if (!allowedMimeTypes.includes(file.mimetype)) {
+          throw new BadRequestException(
+            `Invalid file type for ${file.originalname}. Only JPEG, PNG, and GIF are allowed.`,
+          );
+        }
+        if (file.size > maxFileSize) {
+          throw new BadRequestException(
+            `File ${file.originalname} exceeds the maximum size of ${maxFileSize / 1024 / 1024}MB`,
+          );
+        }
+      }
+
+      // Upload files to Cloudinary concurrently
+      const uploadPromises = files.map(async (file) => {
+        return new Promise<string>((resolve, reject) => {
+          const uploader = cloudinary.uploader.upload_stream(
+            {
+              folder: `cards/${cardId}`,
+              resource_type: 'image',
+              public_id: `${uuidv4()}-${file.originalname.replace(/\.[^/.]+$/, '')}`,
+            },
+            (error, result: CloudinaryUploadResult | undefined) => {
+              if (error || !result) {
+                reject(error || new Error('Upload result is undefined'));
+              } else {
+                resolve(result.secure_url);
+              }
+            },
+          );
+
+          const readableStream = stream.Readable.from(file.buffer);
+          readableStream.pipe(uploader);
+        });
+      });
+
+      let attachmentUrls: string[];
+      try {
+        attachmentUrls = await Promise.all(uploadPromises);
+      } catch (error) {
+        throw new BadRequestException(`Failed to upload file: ${(error as Error).message}`);
+      }
+
+      // Update card with new attachments
+      card.attachments = [...card.attachments, ...attachmentUrls];
+      const updatedCard = await card.save();
+
+      return updatedCard;
+    } catch (err) {
+      console.error('Error in addAttachmentsToCard:', err);
+      if (err instanceof UnauthorizedException || err instanceof BadRequestException) {
+        throw err;
+      }
+      throw new BadRequestException('Failed to add attachments to card');
+    }
+  }
+
+  
   async create(name: string, userId: string): Promise<TrelloBoardDocument> {
     try {
       const user = await this.userService.findById(userId);

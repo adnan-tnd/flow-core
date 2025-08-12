@@ -20,6 +20,9 @@ export class Card extends Document {
 
   @Prop()
   dueDate?: Date;
+
+  @Prop({ type: [String], default: [] })
+  attachments: string[];
 }
 
 export type CardDocument = Card & Document;
