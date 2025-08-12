@@ -5,11 +5,13 @@ import { ProjectService } from './project.service';
 import { ProjectController } from './project.controller';
 import { UserModule } from '../user/user.module';
 import { SprintModule } from '../sprint/sprint.module';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Project.name, schema: ProjectSchema }]),
     UserModule,
+    MailModule,
     forwardRef(() => SprintModule), // Use forwardRef to avoid circular dependency
   ],
   controllers: [ProjectController],

@@ -174,10 +174,13 @@ export class ProjectController {
     @Request() req,
   ) {
     console.log('Request user:', req.user); // Debug log
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
     if (!req.user || ![UserType.CEO, UserType.MANAGER].includes(req.user.type)) {
       throw new BadRequestException('Only CEO or Manager can add members to projects');
     }
-    return this.projectService.addMembers(id, dto);
+    return this.projectService.addMembers(id, dto, req.user.sub);
   }
 
   @Patch(':id/remove-members')
@@ -193,9 +196,12 @@ export class ProjectController {
     @Request() req,
   ) {
     console.log('Request user:', req.user); // Debug log
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
     if (!req.user || ![UserType.CEO, UserType.MANAGER].includes(req.user.type)) {
       throw new BadRequestException('Only CEO or Manager can remove members from projects');
     }
-    return this.projectService.removeMembers(id, dto);
+    return this.projectService.removeMembers(id, dto, req.user.sub);
   }
 }

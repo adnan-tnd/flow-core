@@ -7,6 +7,7 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 import { AddMemberDto } from './dto/add-member.dto';
 import { RemoveMemberDto } from './dto/remove-member.dto';
 import { UserService } from '../user/user.service';
+import { MailService } from '../mail/mail.service';
 import { UserType } from '../user/types/user';
 import { ProjectStatus } from './types/project';
 
@@ -16,6 +17,7 @@ export class ProjectService {
     @InjectModel(Project.name)
     private projectModel: Model<ProjectDocument>,
     private userService: UserService,
+    private mailService: MailService,
   ) {}
 
   async create(createProjectDto: CreateProjectDto, userId: string): Promise<ProjectDocument> {
@@ -36,8 +38,6 @@ export class ProjectService {
           throw new BadRequestException('Invalid project manager ID');
         }
       }
-
-      
 
       const createdProject = new this.projectModel({
         ...createProjectDto,
@@ -138,11 +138,17 @@ export class ProjectService {
     }
   }
 
-  async addMembers(id: string, dto: AddMemberDto): Promise<ProjectDocument> {
+  async addMembers(id: string, dto: AddMemberDto, actorId: string): Promise<ProjectDocument> {
     try {
       const project = await this.projectModel.findById(id);
       if (!project) {
         throw new BadRequestException('Project not found');
+      }
+
+      // Get the user who is performing the action
+      const actor = await this.userService.findById(actorId);
+      if (!actor) {
+        throw new BadRequestException('Invalid actor ID');
       }
 
       // Validate frontendDevs if provided
@@ -159,6 +165,15 @@ export class ProjectService {
         const existingFrontendDevs = new Set(project.frontendDevs.map(id => id.toString()));
         const newFrontendDevs = dto.frontendDevs.filter(id => !existingFrontendDevs.has(id));
         project.frontendDevs = [...project.frontendDevs, ...newFrontendDevs.map(id => new Types.ObjectId(id))];
+        
+        // Send email to each new frontend developer
+        for (const user of frontendUsers) {
+          await this.mailService.sendMail({
+            to: user.email,
+            subject: `Added to Project: ${project.name}`,
+            text: `Hello ${user.name},\n\nYou have been added to the project "${project.name}" as a frontend developer by ${actor.name}.\n\nBest regards,\nProject Management Team`,
+          });
+        }
       }
 
       // Validate backendDevs if provided
@@ -175,8 +190,17 @@ export class ProjectService {
         const existingBackendDevs = new Set(project.backendDevs.map(id => id.toString()));
         const newBackendDevs = dto.backendDevs.filter(id => !existingBackendDevs.has(id));
         project.backendDevs = [...project.backendDevs, ...newBackendDevs.map(id => new Types.ObjectId(id))];
+
+        // Send email to each new backend developer
+        for (const user of backendUsers) {
+          await this.mailService.sendMail({
+            to: user.email,
+            subject: `Added to Project: ${project.name}`,
+            text: `Hello ${user.name},\n\nYou have been added to the project "${project.name}" as a backend developer by ${actor.name}.\n\nBest regards,\nProject Management Team`,
+          });
+        }
       }
-      
+
       return await project.save();
     } catch (err) {
       console.error('Error adding members to project:', err); // Debug log
@@ -184,48 +208,71 @@ export class ProjectService {
     }
   }
 
+  async removeMembers(id: string, dto: RemoveMemberDto, actorId: string): Promise<ProjectDocument> {
+    try {
+      const project = await this.projectModel.findById(id);
+      if (!project) {
+        throw new BadRequestException('Project not found');
+      }
 
-async removeMembers(id: string, dto: RemoveMemberDto): Promise<ProjectDocument> {
-  try {
-    const project = await this.projectModel.findById(id);
-    if (!project) {
-      throw new BadRequestException('Project not found');
+      // Get the user who is performing the action
+      const actor = await this.userService.findById(actorId);
+      if (!actor) {
+        throw new BadRequestException('Invalid actor ID');
+      }
+
+      // Validate and remove frontendDevs if provided
+      if (dto.frontendDevs && dto.frontendDevs.length > 0) {
+        const uniqueFrontendDevs = new Set(dto.frontendDevs);
+        if (uniqueFrontendDevs.size !== dto.frontendDevs.length) {
+          throw new BadRequestException('Duplicate IDs found in frontendDevs');
+        }
+        const frontendUsers = await this.userService.findByIds(dto.frontendDevs);
+        if (frontendUsers.length !== dto.frontendDevs.length) {
+          throw new BadRequestException('Invalid frontend developer IDs');
+        }
+        project.frontendDevs = project.frontendDevs.filter(
+          id => !dto.frontendDevs!.includes(id.toString())
+        );
+       
+        // Send email to each removed frontend developer
+        for (const user of frontendUsers) {
+          await this.mailService.sendMail({
+            to: user.email,
+            subject: `Removed from Project: ${project.name}`,
+            text: `Hello ${user.name},\n\nYou have been removed from the project "${project.name}" by ${actor.name}.\n\nBest regards,\nProject Management Team`,
+          });
+        }
+      }
+
+      // Validate and remove backendDevs if provided
+      if (dto.backendDevs && dto.backendDevs.length > 0) {
+        const uniqueBackendDevs = new Set(dto.backendDevs);
+        if (uniqueBackendDevs.size !== dto.backendDevs.length) {
+          throw new BadRequestException('Duplicate IDs found in backendDevs');
+        }
+        const backendUsers = await this.userService.findByIds(dto.backendDevs);
+        if (backendUsers.length !== dto.backendDevs.length) {
+          throw new BadRequestException('Invalid backend developer IDs');
+        }
+        project.backendDevs = project.backendDevs.filter(
+          id => !dto.backendDevs!.includes(id.toString())
+        );
+
+        // Send email to each removed backend developer
+        for (const user of backendUsers) {
+          await this.mailService.sendMail({
+            to: user.email,
+            subject: `Removed from Project: ${project.name}`,
+            text: `Hello ${user.name},\n\nYou have been removed from the project "${project.name}" by ${actor.name}.\n\nBest regards,\nProject Management Team`,
+          });
+        }
+      }
+
+      return await project.save();
+    } catch (err) {
+      console.error('Error removing members from project:', err); // Debug log
+      throw new BadRequestException(err.message);
     }
-
-    // Validate and remove frontendDevs if provided
-    if (dto.frontendDevs && dto.frontendDevs.length > 0) {
-      const uniqueFrontendDevs = new Set(dto.frontendDevs);
-      if (uniqueFrontendDevs.size !== dto.frontendDevs.length) {
-        throw new BadRequestException('Duplicate IDs found in frontendDevs');
-      }
-      const frontendUsers = await this.userService.findByIds(dto.frontendDevs);
-      if (frontendUsers.length !== dto.frontendDevs.length) {
-        throw new BadRequestException('Invalid frontend developer IDs');
-      }
-      project.frontendDevs = project.frontendDevs.filter(
-        id => !dto.frontendDevs!.includes(id.toString())
-      );
-    }
-
-    // Validate and remove backendDevs if provided
-    if (dto.backendDevs && dto.backendDevs.length > 0) {
-      const uniqueBackendDevs = new Set(dto.backendDevs);
-      if (uniqueBackendDevs.size !== dto.backendDevs.length) {
-        throw new BadRequestException('Duplicate IDs found in backendDevs');
-      }
-      const backendUsers = await this.userService.findByIds(dto.backendDevs);
-      if (backendUsers.length !== dto.backendDevs.length) {
-        throw new BadRequestException('Invalid backend developer IDs');
-      }
-      project.backendDevs = project.backendDevs.filter(
-        id => !dto.backendDevs!.includes(id.toString())
-      );
-    }
-
-    return await project.save();
-  } catch (err) {
-    console.error('Error removing members from project:', err); // Debug log
-    throw new BadRequestException(err.message);
   }
-}
 }
