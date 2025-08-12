@@ -30,8 +30,11 @@ export class TrelloBoard {
   @Prop({ type: [{ type: mongooseSchema.Types.ObjectId, ref: 'User' }], default: [] })
   invitedUsers: Types.ObjectId[];
 
-  @Prop({ type: [PendingInvitation], default: [] })
+   @Prop({ type: [PendingInvitation], default: [] })
   pendingInvitations: PendingInvitation[];
+
+  @Prop({ default: 0 })
+  lastCardNumber: number;
 }
- 
+
 export const TrelloBoardSchema = SchemaFactory.createForClass(TrelloBoard);

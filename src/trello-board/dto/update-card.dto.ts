@@ -1,5 +1,6 @@
-import { IsString, IsOptional, IsArray, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsDateString, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { CardStatus } from '../types/card'; // Adjust path as needed
 
 export class UpdateCardDto {
   @ApiProperty({
@@ -21,17 +22,6 @@ export class UpdateCardDto {
   description?: string;
 
   @ApiProperty({
-    description: 'Array of user IDs to assign to the card (must be board members)',
-    example: ['60d1f8b3c4d5e6f7890abc12', '60d1f8b3c4d5e6f7890abc34'],
-    required: false,
-    type: [String],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  assignedUsers?: string[];
-
-  @ApiProperty({
     description: 'The ID of the new list to move the card to (must belong to the same board)',
     example: 'test-id-1234',
     required: false,
@@ -49,4 +39,13 @@ export class UpdateCardDto {
   @IsOptional()
   @IsDateString()
   dueDate?: Date;
+
+  @ApiProperty({
+    description: 'The updated status of the card',
+    enum: CardStatus,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(CardStatus)
+  status?: CardStatus;
 }

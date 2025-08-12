@@ -13,11 +13,11 @@ import { UserDocument } from '../user/schemas/user.schema';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
 import * as stream from 'stream';
+import { CardStatus } from 'src/trello-board/types/card';
 
-// Define a type for Cloudinary upload result to fix TypeScript redline
 interface CloudinaryUploadResult {
   secure_url: string;
-  [key: string]: any; // Allow other properties
+  [key: string]: any;
 }
 
 @Injectable()
@@ -46,7 +46,6 @@ export class TrelloBoardService {
     userId: string,
   ): Promise<CardDocument> {
     try {
-      // Validate user and permissions
       const user = await this.userService.findById(userId);
       if (!user || !user._id) {
         throw new UnauthorizedException('User not authenticated');
@@ -75,13 +74,12 @@ export class TrelloBoardService {
         throw new UnauthorizedException('Only board members, CEO, or Manager can add attachments to cards');
       }
 
-      // Validate files
       if (!files || files.length === 0) {
         throw new BadRequestException('No files provided');
       }
 
-      const maxFileSize = 5 * 1024 * 1024; // 5MB limit
-      const maxAttachments = 10; // Example limit
+      const maxFileSize = 5 * 1024 * 1024;
+      const maxAttachments = 10;
       if (card.attachments.length + files.length > maxAttachments) {
         throw new BadRequestException(`Cannot add more than ${maxAttachments} attachments to a card`);
       }
@@ -100,7 +98,6 @@ export class TrelloBoardService {
         }
       }
 
-      // Upload files to Cloudinary concurrently
       const uploadPromises = files.map(async (file) => {
         return new Promise<string>((resolve, reject) => {
           const uploader = cloudinary.uploader.upload_stream(
@@ -130,7 +127,6 @@ export class TrelloBoardService {
         throw new BadRequestException(`Failed to upload file: ${(error as Error).message}`);
       }
 
-      // Update card with new attachments
       card.attachments = [...card.attachments, ...attachmentUrls];
       const updatedCard = await card.save();
 
@@ -150,7 +146,6 @@ export class TrelloBoardService {
     userId: string,
   ): Promise<CardDocument> {
     try {
-      // Validate user and permissions
       const user = await this.userService.findById(userId);
       if (!user || !user._id) {
         throw new UnauthorizedException('User not authenticated');
@@ -179,21 +174,16 @@ export class TrelloBoardService {
         throw new UnauthorizedException('Only board members, CEO, or Manager can remove attachments from cards');
       }
 
-      // Validate attachment URLs
       if (!attachmentUrls || attachmentUrls.length === 0) {
         throw new BadRequestException('No attachment URLs provided');
       }
 
-      // Check if all provided URLs exist in the card's attachments
       const invalidUrls = attachmentUrls.filter(url => !card.attachments.includes(url));
       if (invalidUrls.length > 0) {
         throw new BadRequestException('One or more attachment URLs are invalid or not found');
       }
 
-      // Remove the specified attachment URLs
       card.attachments = card.attachments.filter(url => !attachmentUrls.includes(url));
-
-      // Save the updated card
       const updatedCard = await card.save();
 
       return updatedCard;
@@ -217,9 +207,11 @@ export class TrelloBoardService {
         name,
         createdBy: new Types.ObjectId(userId),
         members: [new Types.ObjectId(userId)],
+        lastCardNumber: 0,
       });
       return await createdBoard.save();
     } catch (err) {
+      console.error('Error in create:', err);
       throw new BadRequestException(err.message);
     }
   }
@@ -276,6 +268,7 @@ export class TrelloBoardService {
       board.pendingInvitations.push(...newInvitations);
       await board.save();
     } catch (err) {
+      console.error('Error in addUsers:', err);
       throw new BadRequestException(err.message);
     }
   }
@@ -304,6 +297,7 @@ export class TrelloBoardService {
 
       await board.save();
     } catch (err) {
+      console.error('Error in acceptInvitation:', err);
       throw new BadRequestException(err.message);
     }
   }
@@ -335,6 +329,7 @@ export class TrelloBoardService {
       });
       return await createdList.save();
     } catch (err) {
+      console.error('Error in createList:', err);
       throw new BadRequestException(err.message);
     }
   }
@@ -366,6 +361,7 @@ export class TrelloBoardService {
 
       await this.listModel.deleteOne({ _id: listId });
     } catch (err) {
+      console.error('Error in deleteList:', err);
       throw new BadRequestException(err.message);
     }
   }
@@ -398,11 +394,12 @@ export class TrelloBoardService {
       list.name = newName;
       return await list.save();
     } catch (err) {
+      console.error('Error in updateList:', err);
       throw new BadRequestException(err.message);
     }
   }
 
-  async getBoardLists(boardId: string, userId: string): Promise<Array<{ _id: string; name: string; cards: Array<{ _id: string; name: string }> }>> {
+  async getBoardLists(boardId: string, userId: string): Promise<Array<{ _id: string; name: string; cards: Array<{ _id: string; name: string; status: CardStatus; cardNumber: number }> }>> {
     try {
       const user = await this.userService.findById(userId);
       if (!user || !user._id) {
@@ -425,7 +422,7 @@ export class TrelloBoardService {
         lists.map(async (list) => {
           const cards = await this.cardModel
             .find({ list: list._id })
-            .select('_id name')
+            .select('_id name status cardNumber')
             .lean();
           return {
             _id: list._id.toString(),
@@ -433,6 +430,8 @@ export class TrelloBoardService {
             cards: cards.map((card) => ({
               _id: card._id.toString(),
               name: card.name,
+              status: card.status,
+              cardNumber: card.cardNumber,
             })),
           };
         }),
@@ -440,6 +439,7 @@ export class TrelloBoardService {
 
       return listsWithCards;
     } catch (err) {
+      console.error('Error in getBoardLists:', err);
       throw new BadRequestException(err.message);
     }
   }
@@ -461,6 +461,7 @@ export class TrelloBoardService {
         name: board.name,
       }));
     } catch (err) {
+      console.error('Error in getMyBoards:', err);
       throw new BadRequestException(err.message);
     }
   }
@@ -491,6 +492,7 @@ export class TrelloBoardService {
         } as UserDocument;
       });
     } catch (err) {
+      console.error('Error in getBoardMembers:', err);
       throw new BadRequestException(err.message);
     }
   }
@@ -526,6 +528,9 @@ export class TrelloBoardService {
         throw new UnauthorizedException('Only board members, CEO, or Manager can create cards');
       }
 
+      board.lastCardNumber = (board.lastCardNumber || 0) + 1;
+      await board.save();
+
       const createdCard = new this.cardModel({
         name,
         description,
@@ -533,9 +538,14 @@ export class TrelloBoardService {
         list: new Types.ObjectId(listId),
         createdBy: userIdObj,
         dueDate: dueDate ? new Date(dueDate) : undefined,
+        cardNumber: board.lastCardNumber,
+        status: CardStatus.Pending,
       });
-      return await createdCard.save();
+      const savedCard = await createdCard.save();
+      console.log('Created card with status:', savedCard.status, 'and cardNumber:', savedCard.cardNumber);
+      return savedCard;
     } catch (err) {
+      console.error('Error in createCard:', err);
       throw new BadRequestException(err.message);
     }
   }
@@ -616,6 +626,7 @@ export class TrelloBoardService {
 
       return updatedCard;
     } catch (err) {
+      console.error('Error in addMembersToCard:', err);
       throw new BadRequestException(err.message);
     }
   }
@@ -670,6 +681,7 @@ export class TrelloBoardService {
 
       return await card.save();
     } catch (err) {
+      console.error('Error in removeMembersFromCard:', err);
       throw new BadRequestException(err.message);
     }
   }
@@ -683,9 +695,12 @@ export class TrelloBoardService {
       assignedUsers?: string[];
       listId?: string;
       dueDate?: Date;
+      status?: CardStatus;
     },
   ): Promise<CardDocument> {
     try {
+      console.log('updateCard called with cardId:', cardId, 'userId:', userId, 'updateData:', updateData);
+
       const user = await this.userService.findById(userId);
       if (!user || !user._id) {
         throw new UnauthorizedException('User not authenticated');
@@ -695,6 +710,7 @@ export class TrelloBoardService {
       if (!card) {
         throw new BadRequestException('Card not found');
       }
+      console.log('Current card status:', card.status);
 
       const list = await this.listModel.findById(card.list);
       if (!list) {
@@ -752,13 +768,41 @@ export class TrelloBoardService {
         card.list = new Types.ObjectId(updateData.listId);
       }
 
-      if (updateData.name) card.name = updateData.name;
-      if (updateData.description) card.description = updateData.description;
+      if (updateData.name) {
+        card.name = updateData.name;
+        console.log('Updating name to:', updateData.name);
+      }
+      if (updateData.description) {
+        card.description = updateData.description;
+        console.log('Updating description to:', updateData.description);
+      }
       if (updateData.dueDate !== undefined) {
         card.dueDate = updateData.dueDate ? new Date(updateData.dueDate) : undefined;
+        console.log('Updating dueDate to:', card.dueDate);
+      }
+      if (updateData.status && Object.values(CardStatus).includes(updateData.status)) {
+        console.log('Updating status from:', card.status, 'to:', updateData.status);
+        card.status = updateData.status;
+      } else if (updateData.status) {
+        throw new BadRequestException(`Invalid status value: ${updateData.status}`);
       }
 
       const updatedCard = await card.save();
+      console.log('Saved card with status:', updatedCard.status);
+
+      if (updateData.status && updateData.status !== card.status) {
+        for (const assignedUserId of card.assignedUsers) {
+          const assignedUser = await this.userService.findById(assignedUserId.toString());
+          if (assignedUser) {
+            const cardLink = `http://your-app-domain.com/card/${updatedCard._id}`;
+            await this.mailService.sendMail({
+              to: assignedUser.email,
+              subject: `Card Status Updated: ${card.name} on Board: ${board.name}`,
+              text: `The status of card "${card.name}" on board "${board.name}" has been updated to ${updatedCard.status} by ${user.name}. Click here to view: ${cardLink}`,
+            });
+          }
+        }
+      }
 
       for (const assignedUser of usersToNotify) {
         const cardLink = `http://your-app-domain.com/card/${updatedCard._id}`;
@@ -771,6 +815,7 @@ export class TrelloBoardService {
 
       return updatedCard;
     } catch (err) {
+      console.error('Error in updateCard:', err);
       throw new BadRequestException(err.message);
     }
   }
@@ -807,6 +852,7 @@ export class TrelloBoardService {
 
       await this.cardModel.deleteOne({ _id: cardId });
     } catch (err) {
+      console.error('Error in deleteCard:', err);
       throw new BadRequestException(err.message);
     }
   }
@@ -841,6 +887,7 @@ export class TrelloBoardService {
 
       return card;
     } catch (err) {
+      console.error('Error in getCardDetails:', err);
       throw new BadRequestException(err.message);
     }
   }

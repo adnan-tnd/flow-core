@@ -160,28 +160,25 @@ export class TrelloBoardController {
     return this.trelloBoardService.removeMembersFromCard(cardId, dto.userIds, req.user.sub);
   }
 
-  @Post('update-card/:cardId')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Update an existing card on a Trello board' })
-  @ApiResponse({ status: 200, description: 'Card updated successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 400, description: 'Invalid input' })
-  @ApiParam({ name: 'cardId', description: 'Card ID', type: String })
-  async updateCard(
-    @Param('cardId') cardId: string,
-    @Body() dto: UpdateCardDto,
-    @Request() req,
-  ) {
-    if (!req.user || !req.user.sub) {
-      throw new UnauthorizedException('User not authenticated');
-    }
-    return this.trelloBoardService.updateCard(cardId, req.user.sub, {
-      name: dto.name,
-      description: dto.description,
-      listId: dto.listId,
-      dueDate: dto.dueDate,
-    });
-  }
+ @Post('update-card/:cardId')
+       @UseGuards(JwtAuthGuard)
+       async updateCard(
+         @Param('cardId') cardId: string,
+         @Body() dto: UpdateCardDto,
+         @Request() req,
+       ) {
+         console.log('Controller received DTO:', dto);
+         if (!req.user || !req.user.sub) {
+           throw new UnauthorizedException('User not authenticated');
+         }
+         return this.trelloBoardService.updateCard(cardId, req.user.sub, {
+           name: dto.name,
+           description: dto.description,
+           listId: dto.listId,
+           dueDate: dto.dueDate,
+           status: dto.status,
+         });
+       }
 
   @Delete('delete-card/:cardId')
   @UseGuards(JwtAuthGuard)
