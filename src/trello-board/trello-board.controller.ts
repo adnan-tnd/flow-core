@@ -1,9 +1,8 @@
-
 import { Body, Controller, Post, UseGuards, Request, Get, Param, Delete, UnauthorizedException, BadRequestException, UseInterceptors, UploadedFiles } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { TrelloBoardService } from './trello-board.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiBody,ApiConsumes } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { CreateBoardDto } from './dto/create-board.dto';
 import { AddUsersDto } from './dto/add-users.dto';
 import { CreateListDto } from './dto/create-list.dto';
@@ -13,6 +12,7 @@ import { UpdateCardDto } from './dto/update-card.dto';
 import { AddMembersDto } from './dto/add-members.dto';
 import { RemoveMembersDto } from './dto/remove-members.dto';
 import { AddAttachmentsDto } from './dto/add-attachments.dto';
+import { RemoveAttachmentsDto } from './dto/remove-attachments.dto';
 
 @ApiTags('trello-board')
 @ApiBearerAuth('JWT')
@@ -277,6 +277,26 @@ export class TrelloBoardController {
     }
     return this.trelloBoardService.addAttachmentsToCard(cardId, files.files || [], req.user.sub);
   }
- 
-}
 
+  @Post('remove-attachments/:cardId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Remove attachments from a card' })
+  @ApiResponse({ status: 200, description: 'Attachments removed successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiParam({ name: 'cardId', description: 'Card ID', type: String })
+  @ApiBody({
+    description: 'List of attachment URLs to remove',
+    type: RemoveAttachmentsDto,
+  })
+  async removeAttachmentsFromCard(
+    @Param('cardId') cardId: string,
+    @Body() dto: RemoveAttachmentsDto,
+    @Request() req,
+  ) {
+    if (!req.user || !req.user.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    return this.trelloBoardService.removeAttachmentsFromCard(cardId, dto.attachmentUrls, req.user.sub);
+  }
+}

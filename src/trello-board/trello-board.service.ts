@@ -1,4 +1,3 @@
-
 import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -145,7 +144,68 @@ export class TrelloBoardService {
     }
   }
 
-  
+  async removeAttachmentsFromCard(
+    cardId: string,
+    attachmentUrls: string[],
+    userId: string,
+  ): Promise<CardDocument> {
+    try {
+      // Validate user and permissions
+      const user = await this.userService.findById(userId);
+      if (!user || !user._id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      const card = await this.cardModel.findById(cardId);
+      if (!card) {
+        throw new BadRequestException('Card not found');
+      }
+
+      const list = await this.listModel.findById(card.list);
+      if (!list) {
+        throw new BadRequestException('List not found');
+      }
+
+      const board = await this.trelloBoardModel.findById(list.board);
+      if (!board) {
+        throw new BadRequestException('Board not found');
+      }
+
+      const userIdObj = new Types.ObjectId(user._id as Types.ObjectId);
+      const isBoardMember = board.members.some((id) => (id as Types.ObjectId).equals(userIdObj));
+      const isPrivilegedRole = user.type === UserType.CEO || user.type === UserType.MANAGER;
+
+      if (!isPrivilegedRole && !isBoardMember) {
+        throw new UnauthorizedException('Only board members, CEO, or Manager can remove attachments from cards');
+      }
+
+      // Validate attachment URLs
+      if (!attachmentUrls || attachmentUrls.length === 0) {
+        throw new BadRequestException('No attachment URLs provided');
+      }
+
+      // Check if all provided URLs exist in the card's attachments
+      const invalidUrls = attachmentUrls.filter(url => !card.attachments.includes(url));
+      if (invalidUrls.length > 0) {
+        throw new BadRequestException('One or more attachment URLs are invalid or not found');
+      }
+
+      // Remove the specified attachment URLs
+      card.attachments = card.attachments.filter(url => !attachmentUrls.includes(url));
+
+      // Save the updated card
+      const updatedCard = await card.save();
+
+      return updatedCard;
+    } catch (err) {
+      console.error('Error in removeAttachmentsFromCard:', err);
+      if (err instanceof UnauthorizedException || err instanceof BadRequestException) {
+        throw err;
+      }
+      throw new BadRequestException('Failed to remove attachments from card');
+    }
+  }
+
   async create(name: string, userId: string): Promise<TrelloBoardDocument> {
     try {
       const user = await this.userService.findById(userId);
