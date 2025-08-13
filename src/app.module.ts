@@ -12,6 +12,7 @@ import { ProjectModule } from './project/project.module';
 import { SprintModule } from './sprint/sprint.module';
 import { ReviewModule } from './review/review.module';
 import { TrelloBoardModule } from './trello-board/trello-board.module';
+import { OfficeExpenseModule } from './office-expense/office-expense.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -31,7 +32,8 @@ import { TrelloBoardModule } from './trello-board/trello-board.module';
     ProjectModule,
     SprintModule,
     ReviewModule,
-    TrelloBoardModule
+    TrelloBoardModule,
+    OfficeExpenseModule
    ],
 })
 export class AppModule {
